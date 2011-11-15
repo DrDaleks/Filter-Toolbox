@@ -2,7 +2,7 @@ package plugins.adufour.filtering;
 
 import icy.image.IcyBufferedImage;
 import icy.sequence.Sequence;
-import icy.type.TypeUtil;
+import icy.type.DataType;
 
 public enum Kernels2D implements IKernel
 {
@@ -178,7 +178,7 @@ public enum Kernels2D implements IKernel
 	@Override
 	public Sequence toSequence()
 	{
-		IcyBufferedImage kernelImage = new IcyBufferedImage(width, height, 1, TypeUtil.TYPE_DOUBLE);
+		IcyBufferedImage kernelImage = new IcyBufferedImage(width, height, 1, DataType.DOUBLE);
 		kernelImage.setDataXYAsDouble(0, data);
 		Sequence kernel = new Sequence(kernelImage);
 		kernel.setName(this.toString());

@@ -1,7 +1,7 @@
 package plugins.adufour.filtering;
 
 import icy.sequence.Sequence;
-import icy.type.TypeUtil;
+import icy.type.DataType;
 import icy.type.collection.array.Array1DUtil;
 import plugins.adufour.ezplug.EzVarBoolean;
 import plugins.adufour.filtering.FilterToolbox.Axis;
@@ -92,7 +92,9 @@ public class Convolution1D
 		// Special case: if the input data is already of type double, no conversion is needed.
 		// => use shortcut methods to perform direct "in-place" convolution
 		
-		if (sequence.getDataType() == TypeUtil.TYPE_DOUBLE)
+		DataType type = sequence.getDataType_();
+		
+		if (type == DataType.DOUBLE)
 		{
 			convolution: for (int t = 0; t < sequence.getSizeT(); t++)
 				for (int c = 0; c < sequence.getSizeC(); c++)
@@ -130,7 +132,7 @@ public class Convolution1D
 					for (int i = 0; i < nbIter; i++)
 					{
 						for (int z = 0; z < sequence.getSizeZ(); z++)
-							Array1DUtil.arrayToDoubleArray(sequence.getDataXY(t, z, c), z_xy[z], sequence.isSignedDataType());
+							Array1DUtil.arrayToDoubleArray(sequence.getDataXY(t, z, c), z_xy[z], type.isSigned());
 						
 						convolve(z_xy, sequence.getSizeX(), sequence.getSizeY(), kernelX, kernelY, kernelZ);
 						
@@ -138,7 +140,7 @@ public class Convolution1D
 						{
 							// ArrayMath.rescale(z_xy[z], sequence.getComponentMinValue(c),
 							// sequence.getComponentMaxValue(c), true);
-							Array1DUtil.doubleArrayToSafeArray(z_xy[z], sequence.getDataXY(t, z, c), sequence.isSignedDataType());
+							Array1DUtil.doubleArrayToSafeArray(z_xy[z], sequence.getDataXY(t, z, c), type.isSigned());
 						}
 						
 						if (stopFlag.getValue())
@@ -176,7 +178,9 @@ public class Convolution1D
 		// Special case: if the input data is already of type double, no conversion is needed.
 		// => use shortcut methods to perform direct "in-place" convolution
 		
-		if (sequence.getDataType() == TypeUtil.TYPE_DOUBLE)
+		DataType type = sequence.getDataType_();
+		
+		if (type == DataType.DOUBLE)
 		{
 			for (int t = 0; t < sequence.getSizeT(); t++)
 				for (int c = 0; c < sequence.getSizeC(); c++)
@@ -190,13 +194,13 @@ public class Convolution1D
 				for (int c = 0; c < sequence.getSizeC(); c++)
 				{
 					for (int z = 0; z < sequence.getSizeZ(); z++)
-						Array1DUtil.arrayToDoubleArray(sequence.getDataXY(t, z, c), z_xy[z], sequence.isSignedDataType());
+						Array1DUtil.arrayToDoubleArray(sequence.getDataXY(t, z, c), z_xy[z], type.isSigned());
 					
 					convolve(z_xy, sequence.getSizeX(), sequence.getSizeY(), kernel1D_X, kernel1D_Y, kernel1D_Z);
 					
 					for (int z = 0; z < sequence.getSizeZ(); z++)
 					{
-						Array1DUtil.doubleArrayToSafeArray(z_xy[z], sequence.getDataXY(t, z, c), sequence.isSignedDataType());
+						Array1DUtil.doubleArrayToSafeArray(z_xy[z], sequence.getDataXY(t, z, c), type.isSigned());
 					}
 				}
 		}

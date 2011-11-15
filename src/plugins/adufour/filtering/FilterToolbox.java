@@ -136,6 +136,11 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 			System.out.println("Warning (FilterToolbox): unable to create the OpenCL context. Continuing in pure Java mode.");
 			e.printStackTrace();
 		}
+		catch(NoClassDefFoundError e)
+		{
+			System.out.println("Warning (FilterToolbox): unable to create the OpenCL context. Continuing in pure Java mode.");
+			e.printStackTrace();
+		}
 		catch (UnsatisfiedLinkError linkError)
 		{
 			// throw new EzException("Unable to load OpenCL drivers on this system", true);
@@ -323,7 +328,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 			if (linearY.getValue())
 			{
 				// the kernel along Y must be rotated from X
-				Sequence kernelY_vertical = new Sequence(new IcyBufferedImage(1, kernelY.getSizeX(), 1, kernelY.getDataType()));
+				Sequence kernelY_vertical = new Sequence(new IcyBufferedImage(1, kernelY.getSizeX(), 1, kernelY.getDataType_()));
 				System.arraycopy(kernelY.getDataXY(0, 0, 0), 0, kernelY_vertical.getDataXY(0, 0, 0), 0, kernelY.getSizeX());
 				convolutionCL.convolve(output, kernelY_vertical, zeroEdge.getValue(), iterations.getValue(), stopFlag);
 			}

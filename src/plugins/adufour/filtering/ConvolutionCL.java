@@ -2,6 +2,7 @@ package plugins.adufour.filtering;
 
 import icy.image.IcyBufferedImage;
 import icy.sequence.Sequence;
+import icy.type.DataType;
 import icy.type.collection.array.Array1DUtil;
 
 import java.nio.ByteBuffer;
@@ -78,6 +79,8 @@ public class ConvolutionCL
 		
 		input.beginUpdate();
 		
+		DataType type = input.getDataType_();
+		
 		convolution: for (int t = 0; t < input.getSizeT(); t++)
 		{
 			for (int z = 0; z < input.getSizeZ(); z++)
@@ -87,7 +90,7 @@ public class ConvolutionCL
 				for (int c = 0; c < input.getSizeC(); c++)
 				{
 					// convert image to float
-					Array1DUtil.arrayToFloatArray(image.getDataXY(c), data, image.isSignedDataType());
+					Array1DUtil.arrayToFloatArray(image.getDataXY(c), data, type.isSigned());
 					
 					for (int i = 0; i < nbIter; i++)
 					{
@@ -113,7 +116,7 @@ public class ConvolutionCL
 						outBuffer.rewind();
 						
 						// convert back to image data
-						Array1DUtil.floatArrayToSafeArray(data, image.getDataXY(c), image.isSignedDataType());
+						Array1DUtil.floatArrayToSafeArray(data, image.getDataXY(c), type.isSigned());
 						
 						if (stopFlag.getValue())
 							break convolution;
