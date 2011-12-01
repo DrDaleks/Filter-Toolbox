@@ -337,7 +337,10 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 		}
 		else
 		{
-			Convolution1D.convolve(output, linearX.getValue() ? kernelX : null, linearY.getValue() ? kernelY : null, linearZ.getValue() ? kernelZ : null, iterations.getValue(), stopFlag);
+			if (linearX.getValue() || linearY.getValue() || linearZ.getValue())
+			{
+				Convolution1D.convolve(output, linearX.getValue() ? kernelX : null, linearY.getValue() ? kernelY : null, linearZ.getValue() ? kernelZ : null, iterations.getValue(), stopFlag);
+			}
 		}
 		
 		output.setName(inSeq.getName() + " * " + kernelX.getName() + directions);
