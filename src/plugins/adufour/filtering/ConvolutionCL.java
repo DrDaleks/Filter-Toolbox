@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
 import plugins.adufour.ezplug.EzException;
-import plugins.adufour.ezplug.EzVarBoolean;
+import plugins.adufour.vars.lang.VarBoolean;
 
 import com.nativelibs4java.opencl.CLBuildException;
 import com.nativelibs4java.opencl.CLContext;
@@ -35,7 +35,7 @@ public class ConvolutionCL
 		clProgram = program;
 	}
 	
-	public void convolve(Sequence input, Sequence kernel, boolean zeroEdge, int nbIter, EzVarBoolean stopFlag)
+	public void convolve(Sequence input, Sequence kernel, boolean zeroEdge, int nbIter, VarBoolean stopFlag)
 	{
 		String funcName = zeroEdge ? "convolve2D" : "convolve2D_mirror";
 		

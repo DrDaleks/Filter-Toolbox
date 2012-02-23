@@ -17,6 +17,7 @@ import plugins.adufour.ezplug.EzVarFloatArray;
 import plugins.adufour.ezplug.EzVarInteger;
 import plugins.adufour.ezplug.EzVarListener;
 import plugins.adufour.ezplug.EzVarSequence;
+import plugins.adufour.vars.lang.VarBoolean;
 
 import com.nativelibs4java.opencl.CLBuildException;
 import com.nativelibs4java.opencl.CLContext;
@@ -73,7 +74,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 	
 	public EzVarBoolean					useOpenCL			= new EzVarBoolean("Use OpenCL", false);
 	
-	private EzVarBoolean				stopFlag			= new EzVarBoolean("stop", false);
+	private VarBoolean					stopFlag			= new VarBoolean("stop", false);
 	
 	@Override
 	public void initialize()
@@ -83,8 +84,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 			@Override
 			public void variableChanged(EzVar<Sequence> source, Sequence newValue)
 			{
-				if (newValue == null)
-					return;
+				if (newValue == null) return;
 				
 				boolean is3D = newValue.getSizeZ() > 1;
 				
@@ -136,7 +136,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 			System.out.println("Warning (FilterToolbox): unable to create the OpenCL context. Continuing in pure Java mode.");
 			e.printStackTrace();
 		}
-		catch(NoClassDefFoundError e)
+		catch (NoClassDefFoundError e)
 		{
 			System.out.println("Warning (FilterToolbox): unable to create the OpenCL context. Continuing in pure Java mode.");
 			e.printStackTrace();
@@ -203,12 +203,10 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 				}
 				else
 				{
-					if (userKernelHeight.getVisible())
-						for (int i = 0; i < kernelLines.size(); i++)
-							kernelLines.get(i).setVisible(i < newValue);
+					if (userKernelHeight.isVisible()) for (int i = 0; i < kernelLines.size(); i++)
+						kernelLines.get(i).setVisible(i < newValue);
 				}
-				if (getUI() != null)
-					getUI().repack(true);
+				if (getUI() != null) getUI().repack(true);
 			}
 		});
 		
@@ -312,18 +310,14 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 		Sequence output = inSeq.getCopy();
 		
 		String directions = " along ";
-		if (linearX.getValue())
-			directions += "X";
-		if (linearY.getValue())
-			directions += "Y";
-		if (linearZ.getValue())
-			directions += "Z";
+		if (linearX.getValue()) directions += "X";
+		if (linearY.getValue()) directions += "Y";
+		if (linearZ.getValue()) directions += "Z";
 		
 		if (useOpenCL.getValue())
 		{
 			// the kernel along X is ready
-			if (linearX.getValue())
-				convolutionCL.convolve(output, kernelX, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+			if (linearX.getValue()) convolutionCL.convolve(output, kernelX, zeroEdge.getValue(), iterations.getValue(), stopFlag);
 			
 			if (linearY.getValue())
 			{

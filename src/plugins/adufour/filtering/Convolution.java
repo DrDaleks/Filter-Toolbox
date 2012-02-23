@@ -3,7 +3,7 @@ package plugins.adufour.filtering;
 import icy.sequence.Sequence;
 import icy.type.DataType;
 import icy.type.collection.array.Array1DUtil;
-import plugins.adufour.ezplug.EzVarBoolean;
+import plugins.adufour.vars.lang.VarBoolean;
 
 public class Convolution
 {
@@ -22,7 +22,7 @@ public class Convolution
 	 * @param nbIter
 	 *            the number of filter iterations
 	 */
-	public static void convolve(Sequence input, Sequence kernel, boolean zeroEdges, int nbIter, EzVarBoolean stopFlag)
+	public static void convolve(Sequence input, Sequence kernel, boolean zeroEdges, int nbIter, VarBoolean stopFlag)
 	{
 		DataType type = input.getDataType_();
 

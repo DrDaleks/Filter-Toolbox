@@ -3,8 +3,8 @@ package plugins.adufour.filtering;
 import icy.sequence.Sequence;
 import icy.type.DataType;
 import icy.type.collection.array.Array1DUtil;
-import plugins.adufour.ezplug.EzVarBoolean;
 import plugins.adufour.filtering.FilterToolbox.Axis;
+import plugins.adufour.vars.lang.VarBoolean;
 
 /**
  * 
@@ -32,7 +32,7 @@ public class Convolution1D
 	 */
 	public static void convolve(Sequence sequence, Sequence kernel1D_X, Sequence kernel1D_Y, Sequence kernel1D_Z)
 	{
-		convolve(sequence, kernel1D_X, kernel1D_Y, kernel1D_Z, 1, new EzVarBoolean("stop", false));
+		convolve(sequence, kernel1D_X, kernel1D_Y, kernel1D_Z, 1, new VarBoolean("stop", false));
 	}
 	
 	/**
@@ -50,7 +50,7 @@ public class Convolution1D
 	 * @param kernel1D_Z
 	 *            the kernel to use for convolution along Z
 	 */
-	public static void convolve(Sequence sequence, Sequence kernel1D_X, Sequence kernel1D_Y, Sequence kernel1D_Z, int nbIter, EzVarBoolean stopFlag)
+	public static void convolve(Sequence sequence, Sequence kernel1D_X, Sequence kernel1D_Y, Sequence kernel1D_Z, int nbIter, VarBoolean stopFlag)
 	{
 		if (kernel1D_X == null && kernel1D_Y == null && kernel1D_Z == null)
 			throw new IllegalArgumentException("Invalid argument: provide at least one non-null kernel");
