@@ -324,6 +324,8 @@ public class Convolution1D
 	 * method may return successfully though with incorrect results. Make sure your arguments follow
 	 * the indicated constraints.
 	 * 
+	 * Data outside the sequence in treated with a mirroring condition
+	 * 
 	 * @param input
 	 *            the input image data buffer, given as a [Z (slice)][XY (1D offset)] double array
 	 * @param output
@@ -339,6 +341,34 @@ public class Convolution1D
 	 *            the axis along which to convolve
 	 */
 	public static void convolve1D(double[][] input, double[][] output, int width, int height, double[] kernel, Axis axis)
+	{
+		convolve1D(input, output, width, height, kernel, axis, false);
+	}
+	
+	/**
+	 * Low-level 1D convolution method. <br>
+	 * Warning: this is a low-level method. No check is performed on the input arguments, and the
+	 * method may return successfully though with incorrect results. Make sure your arguments follow
+	 * the indicated constraints.
+	 * 
+	 * @param input
+	 *            the input image data buffer, given as a [Z (slice)][XY (1D offset)] double array
+	 * @param output
+	 *            the output image data buffer, given as a [Z (slice)][XY (1D offset)] double array
+	 *            (must point to a different array than the input)
+	 * @param width
+	 *            the image width
+	 * @param height
+	 *            the image height
+	 * @param kernel
+	 *            an odd-length convolution kernel
+	 * @param axis
+	 *            the axis along which to convolve
+	 * @param zeroEdges
+	 *            true if data outside the sequence should be treated as zero, or false for
+	 *            mirroring condition
+	 */
+	public static void convolve1D(double[][] input, double[][] output, int width, int height, double[] kernel, Axis axis, boolean zeroEdges)
 	{
 		int sliceSize = input[0].length;
 		
@@ -363,7 +393,7 @@ public class Convolution1D
 						int xStartOffset = xy;
 						int xEndOffset = xy + width - 1;
 						
-						// convolve the west border (mirror condition)
+						// convolve the west border
 						
 						for (; x < kRadius; x++, xy++)
 						{
@@ -372,10 +402,18 @@ public class Convolution1D
 							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
 							{
 								int inOffset = xy + kOffset;
-								if (inOffset < xStartOffset)
-									inOffset = xStartOffset + (xStartOffset - inOffset);
-								
-								value += inSlice[inOffset] * kernel[kIndex];
+								if (zeroEdges)  // zero padding
+								{
+									if (inOffset >= xStartOffset)							
+										value += inSlice[inOffset] * kernel[kIndex];
+								}
+								else // mirror condition
+								{
+									if (inOffset < xStartOffset)
+										inOffset = xStartOffset + (xStartOffset - inOffset);
+									
+									value += inSlice[inOffset] * kernel[kIndex];										
+								}
 							}
 							
 							outSlice[xy] = value;
@@ -406,10 +444,19 @@ public class Convolution1D
 							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
 							{
 								int inOffset = xy + kOffset;
-								if (inOffset >= xEndOffset)
-									inOffset = xEndOffset - (inOffset - xEndOffset);
-								
-								value += inSlice[inOffset] * kernel[kIndex];
+								if (zeroEdges) // zero padding
+								{
+									if (inOffset < xEndOffset) {
+										value += inSlice[inOffset] * kernel[kIndex];
+									}
+								}
+								else // mirror condition
+								{
+									if (inOffset >= xEndOffset)
+										inOffset = xEndOffset - (inOffset - xEndOffset);
+									
+									value += inSlice[inOffset] * kernel[kIndex];									
+								}
 							}
 							
 							outSlice[xy] = value;
@@ -431,7 +478,7 @@ public class Convolution1D
 					
 					int y = 0;
 					
-					// convolve the north border (mirror condition)
+					// convolve the north border
 					
 					for (; y < kRadius; y++)
 					{
@@ -444,10 +491,19 @@ public class Convolution1D
 							for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
 							{
 								int inOffset = xy + kOffset;
-								if (inOffset < 0)
-									inOffset = yStartOffset - inOffset;
 								
-								value += in[inOffset] * kernel[kIndex];
+								if (zeroEdges) // zero padding
+								{
+									if (inOffset >= 0)
+										value += in[inOffset] * kernel[kIndex];	
+								}
+								else // mirror condition
+								{
+									if (inOffset < 0)
+										inOffset = yStartOffset - inOffset;
+									
+									value += in[inOffset] * kernel[kIndex];	
+								}
 							}
 							
 							out[xy] = value;
@@ -486,10 +542,18 @@ public class Convolution1D
 							for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
 							{
 								int inOffset = xy + kOffset;
-								if (inOffset >= sliceSize)
-									inOffset = yEndOffset - (inOffset - yEndOffset);
-								
-								value += in[inOffset] * kernel[kIndex];
+								if (zeroEdges) // zero-padding
+								{
+									if (inOffset < sliceSize)
+										value += in[inOffset] * kernel[kIndex];	
+								}
+								else // mirror condition
+								{
+									if (inOffset >= sliceSize)
+										inOffset = yEndOffset - (inOffset - yEndOffset);
+									
+									value += in[inOffset] * kernel[kIndex];									
+								}
 							}
 							
 							out[xy] = value;
@@ -517,10 +581,18 @@ public class Convolution1D
 							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
 							{
 								int inSlice = z + kOffset;
-								if (inSlice < 0)
-									inSlice = -inSlice;
-								
-								value += input[inSlice][xy] * kernel[kIndex];
+								if (zeroEdges) // zero-padding
+								{
+									if (inSlice >= 0)
+										value += input[inSlice][xy] * kernel[kIndex];									
+								}
+								else // mirror condition
+								{
+									if (inSlice < 0)
+										inSlice = -inSlice;
+									
+									value += input[inSlice][xy] * kernel[kIndex];									
+								}
 							}
 							
 							out[xy] = value;
@@ -569,10 +641,18 @@ public class Convolution1D
 							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
 							{
 								int inSlice = z + kOffset;
-								if (inSlice >= input.length)
-									inSlice = zEndOffset - (inSlice - zEndOffset);
-								
-								value += input[inSlice][xy] * kernel[kIndex];
+								if (zeroEdges) // zero-padding
+								{
+									if (inSlice < input.length)
+										value += input[inSlice][xy] * kernel[kIndex];
+								}
+								else // mirror condition
+								{
+									if (inSlice >= input.length)
+										inSlice = zEndOffset - (inSlice - zEndOffset);
+									
+									value += input[inSlice][xy] * kernel[kIndex];									
+								}
 							}
 							
 							out[xy] = value;
