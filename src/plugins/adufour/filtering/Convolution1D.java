@@ -29,8 +29,10 @@ public class Convolution1D
 	 *            the kernel to use for convolution along Y
 	 * @param kernel1D_Z
 	 *            the kernel to use for convolution along Z
+	 * @throws ConvolutionException
+	 *             if a kernel is too large w.r.t. the image size
 	 */
-	public static void convolve(Sequence sequence, Sequence kernel1D_X, Sequence kernel1D_Y, Sequence kernel1D_Z)
+	public static void convolve(Sequence sequence, Sequence kernel1D_X, Sequence kernel1D_Y, Sequence kernel1D_Z) throws ConvolutionException
 	{
 		convolve(sequence, kernel1D_X, kernel1D_Y, kernel1D_Z, 1, new VarBoolean("stop", false));
 	}
@@ -49,38 +51,30 @@ public class Convolution1D
 	 *            the kernel to use for convolution along Y
 	 * @param kernel1D_Z
 	 *            the kernel to use for convolution along Z
+	 * @throws ConvolutionException
+	 *             if a kernel is too large w.r.t. the image size
 	 */
-	public static void convolve(Sequence sequence, Sequence kernel1D_X, Sequence kernel1D_Y, Sequence kernel1D_Z, int nbIter, VarBoolean stopFlag)
+	public static void convolve(Sequence sequence, Sequence kernel1D_X, Sequence kernel1D_Y, Sequence kernel1D_Z, int nbIter, VarBoolean stopFlag) throws ConvolutionException
 	{
-		if (kernel1D_X == null && kernel1D_Y == null && kernel1D_Z == null)
-			throw new IllegalArgumentException("Invalid argument: provide at least one non-null kernel");
+		if (kernel1D_X == null && kernel1D_Y == null && kernel1D_Z == null) throw new IllegalArgumentException("Invalid argument: provide at least one non-null kernel");
 		
 		if (kernel1D_X != null)
 		{
-			if (kernel1D_X.getSizeY() > 1 || kernel1D_X.getSizeZ() > 1)
-				throw new IllegalArgumentException("kernel along X is not 1D");
-			if (kernel1D_X.getSizeX() % 2 == 0)
-				throw new IllegalArgumentException("kernel along X has even size");
-			if (kernel1D_X.getSizeC() != 1 && kernel1D_X.getSizeC() != sequence.getSizeC())
-				throw new IllegalArgumentException("kernel along X has " + kernel1D_X.getSizeC() + " channels");
+			if (kernel1D_X.getSizeY() > 1 || kernel1D_X.getSizeZ() > 1) throw new IllegalArgumentException("kernel along X is not 1D");
+			if (kernel1D_X.getSizeX() % 2 == 0) throw new IllegalArgumentException("kernel along X has even size");
+			if (kernel1D_X.getSizeC() != 1 && kernel1D_X.getSizeC() != sequence.getSizeC()) throw new IllegalArgumentException("kernel along X has " + kernel1D_X.getSizeC() + " channels");
 		}
 		if (kernel1D_Y != null)
 		{
-			if (kernel1D_Y.getSizeY() > 1 || kernel1D_Y.getSizeZ() > 1)
-				throw new IllegalArgumentException("kernel along Y is not 1D");
-			if (kernel1D_Y.getSizeX() % 2 == 0)
-				throw new IllegalArgumentException("kernel along Y has even size");
-			if (kernel1D_Y.getSizeC() != 1 && kernel1D_Y.getSizeC() != sequence.getSizeC())
-				throw new IllegalArgumentException("kernel along Y has " + kernel1D_Y.getSizeC() + " channels");
+			if (kernel1D_Y.getSizeY() > 1 || kernel1D_Y.getSizeZ() > 1) throw new IllegalArgumentException("kernel along Y is not 1D");
+			if (kernel1D_Y.getSizeX() % 2 == 0) throw new IllegalArgumentException("kernel along Y has even size");
+			if (kernel1D_Y.getSizeC() != 1 && kernel1D_Y.getSizeC() != sequence.getSizeC()) throw new IllegalArgumentException("kernel along Y has " + kernel1D_Y.getSizeC() + " channels");
 		}
 		if (kernel1D_Z != null)
 		{
-			if (kernel1D_Z.getSizeY() > 1 || kernel1D_Z.getSizeZ() > 1)
-				throw new IllegalArgumentException("kernel along Z is not 1D");
-			if (kernel1D_Z.getSizeX() % 2 == 0)
-				throw new IllegalArgumentException("kernel along Z has even size");
-			if (kernel1D_Z.getSizeC() != 1 && kernel1D_Z.getSizeC() != sequence.getSizeC())
-				throw new IllegalArgumentException("kernel along Z has " + kernel1D_Z.getSizeC() + " channels");
+			if (kernel1D_Z.getSizeY() > 1 || kernel1D_Z.getSizeZ() > 1) throw new IllegalArgumentException("kernel along Z is not 1D");
+			if (kernel1D_Z.getSizeX() % 2 == 0) throw new IllegalArgumentException("kernel along Z has even size");
+			if (kernel1D_Z.getSizeC() != 1 && kernel1D_Z.getSizeC() != sequence.getSizeC()) throw new IllegalArgumentException("kernel along Z has " + kernel1D_Z.getSizeC() + " channels");
 		}
 		
 		double[] kernelX = null;
@@ -99,19 +93,15 @@ public class Convolution1D
 			convolution: for (int t = 0; t < sequence.getSizeT(); t++)
 				for (int c = 0; c < sequence.getSizeC(); c++)
 				{
-					if (kernel1D_X != null)
-						kernelX = kernel1D_X.getDataXYAsDouble(Math.min(t, kernel1D_X.getSizeT() - 1), 0, Math.min(c, kernel1D_X.getSizeC() - 1));
-					if (kernel1D_Y != null)
-						kernelY = kernel1D_Y.getDataXYAsDouble(Math.min(t, kernel1D_Y.getSizeT() - 1), 0, Math.min(c, kernel1D_Y.getSizeC() - 1));
-					if (kernel1D_Z != null)
-						kernelZ = kernel1D_Z.getDataXYAsDouble(Math.min(t, kernel1D_Z.getSizeT() - 1), 0, Math.min(c, kernel1D_Z.getSizeC() - 1));
+					if (kernel1D_X != null) kernelX = kernel1D_X.getDataXYAsDouble(Math.min(t, kernel1D_X.getSizeT() - 1), 0, Math.min(c, kernel1D_X.getSizeC() - 1));
+					if (kernel1D_Y != null) kernelY = kernel1D_Y.getDataXYAsDouble(Math.min(t, kernel1D_Y.getSizeT() - 1), 0, Math.min(c, kernel1D_Y.getSizeC() - 1));
+					if (kernel1D_Z != null) kernelZ = kernel1D_Z.getDataXYAsDouble(Math.min(t, kernel1D_Z.getSizeT() - 1), 0, Math.min(c, kernel1D_Z.getSizeC() - 1));
 					
 					for (int i = 0; i < nbIter; i++)
 					{
 						convolve(sequence.getDataXYZAsDouble(t, c), sequence.getSizeX(), sequence.getSizeY(), kernelX, kernelY, kernelZ);
 						
-						if (stopFlag.getValue())
-							break convolution;
+						if (stopFlag.getValue()) break convolution;
 					}
 				}
 		}
@@ -122,12 +112,9 @@ public class Convolution1D
 			convolution: for (int t = 0; t < sequence.getSizeT(); t++)
 				for (int c = 0; c < sequence.getSizeC(); c++)
 				{
-					if (kernel1D_X != null)
-						kernelX = kernel1D_X.getDataXYAsDouble(Math.min(t, kernel1D_X.getSizeT() - 1), 0, Math.min(c, kernel1D_X.getSizeC() - 1));
-					if (kernel1D_Y != null)
-						kernelY = kernel1D_Y.getDataXYAsDouble(Math.min(t, kernel1D_Y.getSizeT() - 1), 0, Math.min(c, kernel1D_Y.getSizeC() - 1));
-					if (kernel1D_Z != null)
-						kernelZ = kernel1D_Z.getDataXYAsDouble(Math.min(t, kernel1D_Z.getSizeT() - 1), 0, Math.min(c, kernel1D_Z.getSizeC() - 1));
+					if (kernel1D_X != null) kernelX = kernel1D_X.getDataXYAsDouble(Math.min(t, kernel1D_X.getSizeT() - 1), 0, Math.min(c, kernel1D_X.getSizeC() - 1));
+					if (kernel1D_Y != null) kernelY = kernel1D_Y.getDataXYAsDouble(Math.min(t, kernel1D_Y.getSizeT() - 1), 0, Math.min(c, kernel1D_Y.getSizeC() - 1));
+					if (kernel1D_Z != null) kernelZ = kernel1D_Z.getDataXYAsDouble(Math.min(t, kernel1D_Z.getSizeT() - 1), 0, Math.min(c, kernel1D_Z.getSizeC() - 1));
 					
 					for (int i = 0; i < nbIter; i++)
 					{
@@ -143,8 +130,7 @@ public class Convolution1D
 							Array1DUtil.doubleArrayToSafeArray(z_xy[z], sequence.getDataXY(t, z, c), type.isSigned());
 						}
 						
-						if (stopFlag.getValue())
-							break convolution;
+						if (stopFlag.getValue()) break convolution;
 					}
 				}
 		}
@@ -157,23 +143,23 @@ public class Convolution1D
 	 * 
 	 * @param sequence
 	 *            the Sequence to convolve
-	 * @param kernel1D_X
+	 * @param kernelX
 	 *            the kernel to use for convolution along X
-	 * @param kernel1D_Y
+	 * @param kernelY
 	 *            the kernel to use for convolution along Y
-	 * @param kernel1D_Z
+	 * @param kernelZ
 	 *            the kernel to use for convolution along Z
+	 * @throws IllegalArgumentException
+	 *             if all kernels are null or if a kernel has even size
+	 * @throws ConvolutionException
+	 *             if a kernel is too large w.r.t. the image size
 	 */
-	public static void convolve(Sequence sequence, double[] kernel1D_X, double[] kernel1D_Y, double[] kernel1D_Z)
+	public static void convolve(Sequence sequence, double[] kernelX, double[] kernelY, double[] kernelZ) throws IllegalArgumentException, ConvolutionException
 	{
-		if (kernel1D_X == null && kernel1D_Y == null && kernel1D_Z == null)
-			throw new IllegalArgumentException("Invalid argument: provide at least one non-null kernel");
-		if (kernel1D_X != null && kernel1D_X.length % 2 == 0)
-			throw new IllegalArgumentException("Invalid argument: kernel along X has even size");
-		if (kernel1D_Y != null && kernel1D_Y.length % 2 == 0)
-			throw new IllegalArgumentException("Invalid argument: kernel along Y has even size");
-		if (kernel1D_Z != null && kernel1D_Z.length % 2 == 0)
-			throw new IllegalArgumentException("Invalid argument: kernel along Z has even size");
+		if (kernelX == null && kernelY == null && kernelZ == null) throw new IllegalArgumentException("Invalid argument: provide at least one non-null kernel");
+		if (kernelX != null && kernelX.length % 2 == 0) throw new IllegalArgumentException("Invalid argument: kernel along X has even size");
+		if (kernelY != null && kernelY.length % 2 == 0) throw new IllegalArgumentException("Invalid argument: kernel along Y has even size");
+		if (kernelZ != null && kernelZ.length % 2 == 0) throw new IllegalArgumentException("Invalid argument: kernel along Z has even size");
 		
 		// Special case: if the input data is already of type double, no conversion is needed.
 		// => use shortcut methods to perform direct "in-place" convolution
@@ -184,7 +170,7 @@ public class Convolution1D
 		{
 			for (int t = 0; t < sequence.getSizeT(); t++)
 				for (int c = 0; c < sequence.getSizeC(); c++)
-					convolve(sequence.getDataXYZAsDouble(t, c), sequence.getSizeX(), sequence.getSizeY(), kernel1D_X, kernel1D_Y, kernel1D_Z);
+					convolve(sequence.getDataXYZAsDouble(t, c), sequence.getSizeX(), sequence.getSizeY(), kernelX, kernelY, kernelZ);
 		}
 		else
 		{
@@ -196,7 +182,7 @@ public class Convolution1D
 					for (int z = 0; z < sequence.getSizeZ(); z++)
 						Array1DUtil.arrayToDoubleArray(sequence.getDataXY(t, z, c), z_xy[z], type.isSigned());
 					
-					convolve(z_xy, sequence.getSizeX(), sequence.getSizeY(), kernel1D_X, kernel1D_Y, kernel1D_Z);
+					convolve(z_xy, sequence.getSizeX(), sequence.getSizeY(), kernelX, kernelY, kernelZ);
 					
 					for (int z = 0; z < sequence.getSizeZ(); z++)
 					{
@@ -227,12 +213,10 @@ public class Convolution1D
 	 *            a 1D odd-length kernel to convolve along Y (or null to skip convolution along Y)
 	 * @param kernelZ
 	 *            a 1D odd-length kernel to convolve along Z (or null to skip convolution along Z)
-	 * @throws IllegalArgumentException
-	 *             If all kernels are null or of even size
-	 * @throws NullPointerException
-	 *             If the output array is null
+	 * @throws ConvolutionException
+	 *             if a kernel is too large w.r.t the image size
 	 */
-	public static void convolve(double[][] array, int imageWidth, int imageHeight, double[] kernelX, double[] kernelY, double[] kernelZ) throws IllegalArgumentException, NullPointerException
+	public static void convolve(double[][] array, int imageWidth, int imageHeight, double[] kernelX, double[] kernelY, double[] kernelZ) throws ConvolutionException
 	{
 		int sliceSize = array[0].length;
 		
@@ -337,250 +321,253 @@ public class Convolution1D
 	 *            an odd-length convolution kernel
 	 * @param axis
 	 *            the axis along which to convolve
+	 * @throws ConvolutionException
+	 *             if a kernel is too large w.r.t. the image size
 	 */
-	public static void convolve1D(double[][] input, double[][] output, int width, int height, double[] kernel, Axis axis)
+	public static void convolve1D(double[][] input, double[][] output, int width, int height, double[] kernel, Axis axis) throws ConvolutionException
 	{
-		int sliceSize = input[0].length;
-		
-		int kRadius = (kernel.length - 1) / 2;
-		
-		switch (axis)
+		try
 		{
-			case X:
-			{
-				for (int z = 0; z < input.length; z++)
-				{
-					double[] inSlice = input[z];
-					double[] outSlice = output[z];
-					int xy = 0;
-					
-					for (int y = 0; y < height; y++)
-					{
-						int x = 0;
-						
-						// store the offset of the first and last elements of the line
-						// they will be used to compute mirror conditions
-						int xStartOffset = xy;
-						int xEndOffset = xy + width - 1;
-						
-						// convolve the west border (mirror condition)
-						
-						for (; x < kRadius; x++, xy++)
-						{
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-							{
-								int inOffset = xy + kOffset;
-								if (inOffset < xStartOffset)
-									inOffset = xStartOffset + (xStartOffset - inOffset);
-								
-								value += inSlice[inOffset] * kernel[kIndex];
-							}
-							
-							outSlice[xy] = value;
-						}
-						
-						// convolve the central area until the east border
-						
-						int eastBorder = width - kRadius;
-						
-						for (; x < eastBorder; x++, xy++)
-						{
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-							{
-								value += inSlice[xy + kOffset] * kernel[kIndex];
-							}
-							
-							outSlice[xy] = value;
-						}
-						
-						// convolve the east border
-						
-						for (; x < width; x++, xy++)
-						{
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-							{
-								int inOffset = xy + kOffset;
-								if (inOffset >= xEndOffset)
-									inOffset = xEndOffset - (inOffset - xEndOffset);
-								
-								value += inSlice[inOffset] * kernel[kIndex];
-							}
-							
-							outSlice[xy] = value;
-						}
-					}
-				}
-			}
-			break;
+			int sliceSize = input[0].length;
 			
-			case Y:
-			{
-				int kRadiusY = kRadius * width;
-				
-				for (int z = 0; z < input.length; z++)
-				{
-					double[] in = input[z];
-					double[] out = output[z];
-					int xy = 0;
-					
-					int y = 0;
-					
-					// convolve the north border (mirror condition)
-					
-					for (; y < kRadius; y++)
-					{
-						for (int x = 0; x < width; x++, xy++)
-						{
-							int yStartOffset = x;
-							
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
-							{
-								int inOffset = xy + kOffset;
-								if (inOffset < 0)
-									inOffset = yStartOffset - inOffset;
-								
-								value += in[inOffset] * kernel[kIndex];
-							}
-							
-							out[xy] = value;
-						}
-					}
-					
-					// convolve the central area until the south border
-					
-					int southBorder = height - kRadius;
-					
-					for (; y < southBorder; y++)
-					{
-						for (int x = 0; x < width; x++, xy++)
-						{
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
-							{
-								value += in[xy + kOffset] * kernel[kIndex];
-							}
-							
-							out[xy] = value;
-						}
-					}
-					
-					// convolve the south border
-					
-					for (; y < height; y++)
-					{
-						for (int x = 0; x < width; x++, xy++)
-						{
-							int yEndOffset = sliceSize - width + x;
-							
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
-							{
-								int inOffset = xy + kOffset;
-								if (inOffset >= sliceSize)
-									inOffset = yEndOffset - (inOffset - yEndOffset);
-								
-								value += in[inOffset] * kernel[kIndex];
-							}
-							
-							out[xy] = value;
-						}
-					}
-				}
-			}
-			break;
+			int kRadius = (kernel.length - 1) / 2;
 			
-			case Z:
+			switch (axis)
 			{
-				int z = 0;
-				for (; z < kRadius; z++)
+				case X:
 				{
-					double[] out = output[z];
-					
-					int xy = 0;
-					
-					for (int y = 0; y < height; y++)
+					for (int z = 0; z < input.length; z++)
 					{
-						for (int x = 0; x < width; x++, xy++)
+						double[] inSlice = input[z];
+						double[] outSlice = output[z];
+						int xy = 0;
+						
+						for (int y = 0; y < height; y++)
 						{
-							double value = 0;
+							int x = 0;
 							
-							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+							// store the offset of the first and last elements of the line
+							// they will be used to compute mirror conditions
+							int xStartOffset = xy;
+							int xEndOffset = xy + width - 1;
+							
+							// convolve the west border (mirror condition)
+							
+							for (; x < kRadius; x++, xy++)
 							{
-								int inSlice = z + kOffset;
-								if (inSlice < 0)
-									inSlice = -inSlice;
+								double value = 0;
 								
-								value += input[inSlice][xy] * kernel[kIndex];
-							}
-							
-							out[xy] = value;
-						}
-					}
-				}
-				
-				int bottomBorder = input.length - kRadius;
-				
-				for (; z < bottomBorder; z++)
-				{
-					double[] out = output[z];
-					
-					int xy = 0;
-					
-					for (int y = 0; y < height; y++)
-					{
-						for (int x = 0; x < width; x++, xy++)
-						{
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-							{
-								value += input[z + kOffset][xy] * kernel[kIndex];
-							}
-							
-							out[xy] = value;
-						}
-					}
-				}
-				
-				int zEndOffset = input.length - 1;
-				
-				for (; z < input.length; z++)
-				{
-					double[] out = output[z];
-					
-					int xy = 0;
-					
-					for (int y = 0; y < height; y++)
-					{
-						for (int x = 0; x < width; x++, xy++)
-						{
-							double value = 0;
-							
-							for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-							{
-								int inSlice = z + kOffset;
-								if (inSlice >= input.length)
-									inSlice = zEndOffset - (inSlice - zEndOffset);
+								for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+								{
+									int inOffset = xy + kOffset;
+									if (inOffset < xStartOffset) inOffset = xStartOffset + (xStartOffset - inOffset);
+									
+									value += inSlice[inOffset] * kernel[kIndex];
+								}
 								
-								value += input[inSlice][xy] * kernel[kIndex];
+								outSlice[xy] = value;
 							}
 							
-							out[xy] = value;
+							// convolve the central area until the east border
+							
+							int eastBorder = width - kRadius;
+							
+							for (; x < eastBorder; x++, xy++)
+							{
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+								{
+									value += inSlice[xy + kOffset] * kernel[kIndex];
+								}
+								
+								outSlice[xy] = value;
+							}
+							
+							// convolve the east border
+							
+							for (; x < width; x++, xy++)
+							{
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+								{
+									int inOffset = xy + kOffset;
+									if (inOffset >= xEndOffset) inOffset = xEndOffset - (inOffset - xEndOffset);
+									
+									value += inSlice[inOffset] * kernel[kIndex];
+								}
+								
+								outSlice[xy] = value;
+							}
 						}
 					}
 				}
+				break;
+				
+				case Y:
+				{
+					int kRadiusY = kRadius * width;
+					
+					for (int z = 0; z < input.length; z++)
+					{
+						double[] in = input[z];
+						double[] out = output[z];
+						int xy = 0;
+						
+						int y = 0;
+						
+						// convolve the north border (mirror condition)
+						
+						for (; y < kRadius; y++)
+						{
+							for (int x = 0; x < width; x++, xy++)
+							{
+								int yStartOffset = x;
+								
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
+								{
+									int inOffset = xy + kOffset;
+									if (inOffset < 0) inOffset = yStartOffset - inOffset;
+									
+									value += in[inOffset] * kernel[kIndex];
+								}
+								
+								out[xy] = value;
+							}
+						}
+						
+						// convolve the central area until the south border
+						
+						int southBorder = height - kRadius;
+						
+						for (; y < southBorder; y++)
+						{
+							for (int x = 0; x < width; x++, xy++)
+							{
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
+								{
+									value += in[xy + kOffset] * kernel[kIndex];
+								}
+								
+								out[xy] = value;
+							}
+						}
+						
+						// convolve the south border
+						
+						for (; y < height; y++)
+						{
+							for (int x = 0; x < width; x++, xy++)
+							{
+								int yEndOffset = sliceSize - width + x;
+								
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
+								{
+									int inOffset = xy + kOffset;
+									if (inOffset >= sliceSize) inOffset = yEndOffset - (inOffset - yEndOffset);
+									
+									value += in[inOffset] * kernel[kIndex];
+								}
+								
+								out[xy] = value;
+							}
+						}
+					}
+				}
+				break;
+				
+				case Z:
+				{
+					int z = 0;
+					for (; z < kRadius; z++)
+					{
+						double[] out = output[z];
+						
+						int xy = 0;
+						
+						for (int y = 0; y < height; y++)
+						{
+							for (int x = 0; x < width; x++, xy++)
+							{
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+								{
+									int inSlice = z + kOffset;
+									if (inSlice < 0) inSlice = -inSlice;
+									
+									value += input[inSlice][xy] * kernel[kIndex];
+								}
+								
+								out[xy] = value;
+							}
+						}
+					}
+					
+					int bottomBorder = input.length - kRadius;
+					
+					for (; z < bottomBorder; z++)
+					{
+						double[] out = output[z];
+						
+						int xy = 0;
+						
+						for (int y = 0; y < height; y++)
+						{
+							for (int x = 0; x < width; x++, xy++)
+							{
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+								{
+									value += input[z + kOffset][xy] * kernel[kIndex];
+								}
+								
+								out[xy] = value;
+							}
+						}
+					}
+					
+					int zEndOffset = input.length - 1;
+					
+					for (; z < input.length; z++)
+					{
+						double[] out = output[z];
+						
+						int xy = 0;
+						
+						for (int y = 0; y < height; y++)
+						{
+							for (int x = 0; x < width; x++, xy++)
+							{
+								double value = 0;
+								
+								for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+								{
+									int inSlice = z + kOffset;
+									if (inSlice >= input.length) inSlice = zEndOffset - (inSlice - zEndOffset);
+									
+									value += input[inSlice][xy] * kernel[kIndex];
+								}
+								
+								out[xy] = value;
+							}
+						}
+					}
+				}
+				break;
 			}
-			break;
+		}
+		catch (ArrayIndexOutOfBoundsException e)
+		{
+			throw new ConvolutionException("Filter size is too large along " + axis.name(), e);
 		}
 	}
 	

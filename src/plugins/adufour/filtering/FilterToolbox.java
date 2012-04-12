@@ -6,6 +6,7 @@ import icy.sequence.Sequence;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import plugins.adufour.ezplug.EzException;
 import plugins.adufour.ezplug.EzGroup;
 import plugins.adufour.ezplug.EzPlug;
 import plugins.adufour.ezplug.EzStoppable;
@@ -333,7 +334,14 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 		{
 			if (linearX.getValue() || linearY.getValue() || linearZ.getValue())
 			{
-				Convolution1D.convolve(output, linearX.getValue() ? kernelX : null, linearY.getValue() ? kernelY : null, linearZ.getValue() ? kernelZ : null, iterations.getValue(), stopFlag);
+				try
+				{
+					Convolution1D.convolve(output, linearX.getValue() ? kernelX : null, linearY.getValue() ? kernelY : null, linearZ.getValue() ? kernelZ : null, iterations.getValue(), stopFlag);
+				}
+				catch (ConvolutionException e)
+				{
+					throw new EzException(e.getMessage(), true);
+				}
 			}
 		}
 		
