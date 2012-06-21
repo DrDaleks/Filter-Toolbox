@@ -275,7 +275,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 		}
 		
 		output.setName(inSeq.getName() + " * " + kernel.getName());
-		output.updateComponentsBounds(true);
+		output.updateChannelsBounds(true);
 		addSequence(output);
 	}
 	
@@ -346,7 +346,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
 		}
 		
 		output.setName(inSeq.getName() + " * " + kernelX.getName() + directions);
-		output.updateComponentsBounds(true);
+		output.updateChannelsBounds(true);
 		addSequence(output);
 	}
 	
