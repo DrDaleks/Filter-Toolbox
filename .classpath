@@ -5,5 +5,6 @@
 	<classpathentry kind="var" path="ICY_HOME/icy.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/EzPlug"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/Vars"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/Blocks"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
