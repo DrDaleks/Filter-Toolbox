@@ -37,7 +37,7 @@ public class GaussianFilter extends Plugin implements Block, PluginBundled
         double[] gaussianZ = Kernels1D.CUSTOM_GAUSSIAN.createGaussianKernel1D(gZ.getValue(true)).getData();
         
         Sequence filtered = input.getValue(true).getCopy();
-        filtered.setName("filtered " + id++);
+        filtered.setName(input.getValue().getName() + "_filtered");
         
         try
         {
