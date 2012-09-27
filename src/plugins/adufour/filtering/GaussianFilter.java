@@ -3,6 +3,7 @@ package plugins.adufour.filtering;
 import icy.plugin.abstract_.Plugin;
 import icy.plugin.interface_.PluginBundled;
 import icy.sequence.Sequence;
+import icy.sequence.SequenceUtil;
 import plugins.adufour.blocks.lang.Block;
 import plugins.adufour.blocks.util.VarList;
 import plugins.adufour.vars.gui.model.DoubleRangeModel;
@@ -36,7 +37,7 @@ public class GaussianFilter extends Plugin implements Block, PluginBundled
         double[] gaussianY = Kernels1D.CUSTOM_GAUSSIAN.createGaussianKernel1D(gY.getValue(true)).getData();
         double[] gaussianZ = Kernels1D.CUSTOM_GAUSSIAN.createGaussianKernel1D(gZ.getValue(true)).getData();
         
-        Sequence filtered = input.getValue(true).getCopy();
+        Sequence filtered = SequenceUtil.getCopy(input.getValue(true));
         filtered.setName(input.getValue().getName() + "_filtered");
         
         try

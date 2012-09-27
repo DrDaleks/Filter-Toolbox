@@ -1,7 +1,9 @@
 package plugins.adufour.filtering;
 
 import icy.image.IcyBufferedImage;
+import icy.sequence.DimensionId;
 import icy.sequence.Sequence;
+import icy.sequence.SequenceUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,12 +14,14 @@ import plugins.adufour.ezplug.EzPlug;
 import plugins.adufour.ezplug.EzStoppable;
 import plugins.adufour.ezplug.EzVar;
 import plugins.adufour.ezplug.EzVarBoolean;
+import plugins.adufour.ezplug.EzVarDimensionPicker;
 import plugins.adufour.ezplug.EzVarDouble;
 import plugins.adufour.ezplug.EzVarDoubleArrayNative;
 import plugins.adufour.ezplug.EzVarEnum;
 import plugins.adufour.ezplug.EzVarInteger;
 import plugins.adufour.ezplug.EzVarListener;
 import plugins.adufour.ezplug.EzVarSequence;
+import plugins.adufour.filtering.NonLinearFilter.NonLinearFilterType;
 import plugins.adufour.vars.lang.VarBoolean;
 
 import com.nativelibs4java.opencl.CLBuildException;
@@ -39,7 +43,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     
     public enum FilterType
     {
-        CLASSIC, SEPARABLE
+        CLASSIC, SEPARABLE, NON_LINEAR
     }
     
     public EzVarSequence                     input            = new EzVarSequence("input");
@@ -61,11 +65,19 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     public EzVarDouble                       gaborKy          = new EzVarDouble("Ky", 0, 100, 0.1);
     public EzVarBoolean                      gaborSymmetric   = new EzVarBoolean("Symmertric", true);
     
+    public EzVarEnum<NonLinearFilterType>    nonLinType       = new EzVarEnum<NonLinearFilterType>("filter type", NonLinearFilterType.values());
+    
     public EzVarBoolean                      zeroEdge         = new EzVarBoolean("Zero on edge", false);
     
     public EzVarInteger                      userKernelWidth  = new EzVarInteger("kernel width", 3, MAX_KERNEL_SIZE, 2);
     public EzVarInteger                      userKernelHeight = new EzVarInteger("kernel height", 1, MAX_KERNEL_SIZE, 2);
     public ArrayList<EzVarDoubleArrayNative> kernelLines      = new ArrayList<EzVarDoubleArrayNative>(1);
+    
+    public EzVarSequence                     customKernel     = new EzVarSequence("Kernel sequence");
+    public EzVarDimensionPicker              customKernel_T   = new EzVarDimensionPicker("T", DimensionId.T, customKernel.getVariable());
+    public EzVarDimensionPicker              customKernel_Z   = new EzVarDimensionPicker("Z", DimensionId.Z, customKernel.getVariable());
+    public EzVarDimensionPicker              customKernel_C   = new EzVarDimensionPicker("C", DimensionId.C, customKernel.getVariable());
+    
     public EzVarInteger                      iterations       = new EzVarInteger("nb. iterations", 1, 1, 10000, 1);
     
     private ConvolutionCL                    convolutionCL;
@@ -149,6 +161,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         }
         
         addEzComponent(filterType);
+        filterType.addVisibilityTriggerTo(useOpenCL, FilterType.CLASSIC, FilterType.SEPARABLE);
         
         addEzComponent(kernel1D);
         filterType.addVisibilityTriggerTo(kernel1D, FilterType.SEPARABLE);
@@ -168,11 +181,21 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         addEzComponent(gaborGroup);
         kernel2D.addVisibilityTriggerTo(gaborGroup, Kernels2D.CUSTOM_GABOR);
         
+        EzGroup customSequenceGroup = new EzGroup("Custom sequence", customKernel, customKernel_T, customKernel_Z, customKernel_C);
+        addEzComponent(customSequenceGroup);
+        kernel2D.addVisibilityTriggerTo(customSequenceGroup, Kernels2D.CUSTOM_SEQUENCE);
+        
+        addEzComponent(nonLinType);
+        filterType.addVisibilityTriggerTo(nonLinType, FilterType.NON_LINEAR);
+        
         addEzComponent(zeroEdge);
+        filterType.addVisibilityTriggerTo(zeroEdge, FilterType.CLASSIC, FilterType.SEPARABLE);
         
         addEzComponent(userKernelWidth);
         kernel1D.addVisibilityTriggerTo(userKernelWidth, Kernels1D.CUSTOM);
         kernel2D.addVisibilityTriggerTo(userKernelWidth, Kernels2D.CUSTOM);
+        filterType.addVisibilityTriggerTo(userKernelWidth, FilterType.NON_LINEAR);
+        
         addEzComponent(userKernelHeight);
         kernel2D.addVisibilityTriggerTo(userKernelHeight, Kernels2D.CUSTOM);
         
@@ -233,7 +256,23 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 executeClassic(inSeq);
                 break;
             }
+            case NON_LINEAR:
+            {
+                executeNonLinear(inSeq);
+                break;
+            }
         }
+    }
+    
+    private void executeNonLinear(Sequence inSeq)
+    {
+        Sequence out = SequenceUtil.getCopy(inSeq);
+        for (int i = 0; i < iterations.getValue(); i++)
+        {
+            NonLinearFilter.filter(stopFlag, out, nonLinType.getValue(), userKernelWidth.getValue() / 2);
+            if (stopFlag.getValue()) break;
+        }
+        addSequence(out);
     }
     
     private void executeClassic(Sequence inSeq)
@@ -260,10 +299,16 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 k2d.createCustomKernel2D(values, userKernelWidth.getValue(), userKernelHeight.getValue(), false);
             }
             break;
+            
+            case CUSTOM_SEQUENCE:
+            {
+                k2d.createCustomKernel2D(customKernel.getValue(true), customKernel_T.getValue(), customKernel_Z.getValue(), customKernel_C.getValue());
+            }
+            break;
         }
         
         Sequence kernel = k2d.toSequence();
-        Sequence output = inSeq.getCopy();
+        Sequence output = SequenceUtil.getCopy(inSeq);
         
         if (useOpenCL.getValue())
         {
@@ -303,7 +348,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 kernelX = kernelY = kernelZ = k1d.toSequence();
         }
         
-        Sequence output = inSeq.getCopy();
+        Sequence output = SequenceUtil.getCopy(inSeq);
         
         String directions = " along ";
         if (linearX.getValue()) directions += "X";
