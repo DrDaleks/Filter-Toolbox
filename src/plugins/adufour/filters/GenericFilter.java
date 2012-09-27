@@ -43,6 +43,7 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
         addEzComponent(input);
         addEzComponent(filterOp);
         addEzComponent(radius);
+        setTimeDisplay(true);
     }
     
     @Override
@@ -99,7 +100,7 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
         
         if (radius.length == 0) throw new IllegalArgumentException("Provide at least one filter radius");
         
-        ExecutorService service = Executors.newFixedThreadPool(SystemUtil.getAvailableProcessors());
+        ExecutorService service = Executors.newFixedThreadPool(SystemUtil.getAvailableProcessors() * 2);
         
         final int width = sequence.getSizeX();
         final int height = sequence.getSizeY();
@@ -171,6 +172,8 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
                                         // out-of-range => nothing to do
                                         if (inZ < 0 || inZ >= depth) continue;
                                         
+                                        double[] inSlice = in_Z_XY[inZ];
+                                        
                                         // browse the neighborhood along Y
                                         for (kY = -kHeight; kY <= kHeight; kY++)
                                         {
@@ -190,7 +193,7 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
                                                 // out-of-range => nothing to do
                                                 if (inX < 0 || inX >= width) continue;
                                                 
-                                                neighborhood[localNeighborHoodSize++] = in_Z_XY[inZ][inXY + inX];
+                                                neighborhood[localNeighborHoodSize++] = inSlice[inXY + inX];
                                             }
                                         }
                                     }
