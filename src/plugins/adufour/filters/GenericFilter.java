@@ -113,7 +113,7 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
         final int kHeight = radius.length == 1 ? kWidth : radius[1];
         final int kDepth = radius.length == 1 ? kWidth : radius.length == 2 ? 1 : radius[2];
         
-        final int neighorhoodSize = (1 + kWidth * 2) * (1 + kHeight * 2) * ( 1 + kDepth * 2);
+        final int neighorhoodSize = (1 + kWidth * 2) * (1 + kHeight * 2) * (1 + kDepth * 2);
         
         // temporary buffers in double precision
         final double[][] in_Z_XY = new double[depth][width * height];
@@ -137,6 +137,7 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
                 {
                     final int slice = z;
                     
+                    final double[] _inXY = in_Z_XY[slice];
                     final double[] _outXY = outSlices[z].getDataXYAsDouble(c);
                     
                     for (int y = 0; y < height; y++)
@@ -162,7 +163,7 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
                                 {
                                     int localNeighborHoodSize = 0;
                                     
-                                    double currentValue = in_Z_XY[slice][outXY];
+                                    double currentValue = _inXY[outXY];
                                     
                                     // browse the neighborhood along Z
                                     for (kZ = -kDepth; kZ <= kDepth; kZ++)
@@ -241,7 +242,7 @@ public class GenericFilter extends EzPlug implements EzStoppable, Block
         sequence.dataChanged();
         service.shutdown();
     }
-    
+        
     @Override
     public void clean()
     {
