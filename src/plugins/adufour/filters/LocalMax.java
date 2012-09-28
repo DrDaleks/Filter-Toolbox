@@ -1,12 +1,19 @@
 package plugins.adufour.filters;
 
-import icy.math.ArrayMath;
-
 public class LocalMax extends GenericFilterOperation
 {
     @Override
-    double process(double currentValue, double[] neighborhood)
+    double process(double currentValue, double[] neighborhood, int neighborhoodSize)
     {
-        return currentValue >= ArrayMath.max(neighborhood) ? 1.0 : 0.0;
+        double defaultValue = 0.0;
+        
+        for (int i = 0; i < neighborhoodSize; i++)
+        {
+            double d = neighborhood[i];
+            if (d > currentValue) return 0.0;
+            if (defaultValue == 0.0 && d < currentValue) defaultValue = 1.0;
+        }
+        
+        return defaultValue;
     }
 }

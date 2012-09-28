@@ -1,12 +1,13 @@
 package plugins.adufour.filters;
 
-import icy.math.ArrayMath;
-
 public class Mean extends GenericFilterOperation
 {
     @Override
-    double process(double currentValue, double[] neighborhood)
+    double process(double currentValue, double[] neighborhood, int neighborhoodSize)
     {
-        return ArrayMath.mean(neighborhood);
+        double sum = neighborhood[0];
+        for (int i = 1; i < neighborhoodSize; i++)
+            sum += neighborhood[i];
+        return sum / neighborhoodSize;
     }
 }

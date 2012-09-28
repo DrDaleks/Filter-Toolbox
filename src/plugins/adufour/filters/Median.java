@@ -1,12 +1,13 @@
 package plugins.adufour.filters;
 
-import icy.math.ArrayMath;
+import java.util.Arrays;
 
 public class Median extends GenericFilterOperation
 {
     @Override
-    double process(double currentValue, double[] neighborhood)
+    double process(double currentValue, double[] neighborhood, int neighborhoodSize)
     {
-        return ArrayMath.median(neighborhood, false);
+        Arrays.sort(neighborhood, 0, neighborhoodSize);
+        return neighborhood[neighborhoodSize / 2 + 1];
     }
 }
