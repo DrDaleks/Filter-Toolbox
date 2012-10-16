@@ -20,9 +20,11 @@ import plugins.adufour.ezplug.EzVarDoubleArrayNative;
 import plugins.adufour.ezplug.EzVarEnum;
 import plugins.adufour.ezplug.EzVarInteger;
 import plugins.adufour.ezplug.EzVarListener;
+import plugins.adufour.ezplug.EzVarPlugin;
 import plugins.adufour.ezplug.EzVarSequence;
-import plugins.adufour.filtering.NonLinearFilter.NonLinearFilterType;
+import plugins.adufour.vars.lang.Var;
 import plugins.adufour.vars.lang.VarBoolean;
+import plugins.adufour.vars.util.VarListener;
 
 import com.nativelibs4java.opencl.CLBuildException;
 import com.nativelibs4java.opencl.CLContext;
@@ -34,7 +36,7 @@ import com.ochafik.io.ReadText;
 
 public class FilterToolbox extends EzPlug implements EzStoppable
 {
-    private final static int MAX_KERNEL_SIZE = 13;
+    private final static int MAX_KERNEL_SIZE = 99;
     
     public enum Axis
     {
@@ -43,7 +45,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     
     public enum FilterType
     {
-        CLASSIC, SEPARABLE, NON_LINEAR
+        CLASSIC, SEPARABLE, SELECTION
     }
     
     public EzVarSequence                     input            = new EzVarSequence("input");
@@ -65,7 +67,10 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     public EzVarDouble                       gaborKy          = new EzVarDouble("Ky", 0, 100, 0.1);
     public EzVarBoolean                      gaborSymmetric   = new EzVarBoolean("Symmertric", true);
     
-    public EzVarEnum<NonLinearFilterType>    nonLinType       = new EzVarEnum<NonLinearFilterType>("filter type", NonLinearFilterType.values());
+    public EzVarPlugin<SelectionFilter>      selectionFilter  = new EzVarPlugin<SelectionFilter>("selection filter", SelectionFilter.class);
+    public EzVarInteger                      selectionRadiusX = new EzVarInteger("Filter radius (X)", 1, 0, MAX_KERNEL_SIZE, 1);
+    public EzVarInteger                      selectionRadiusY = new EzVarInteger("Filter radius (Y)", 1, 0, MAX_KERNEL_SIZE, 1);
+    public EzVarInteger                      selectionRadiusZ = new EzVarInteger("Filter radius (Z)", 1, 0, MAX_KERNEL_SIZE, 1);
     
     public EzVarBoolean                      zeroEdge         = new EzVarBoolean("Zero on edge", false);
     
@@ -88,6 +93,8 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     public EzVarBoolean                      useOpenCL        = new EzVarBoolean("Use OpenCL", false);
     
     private VarBoolean                       stopFlag         = new VarBoolean("stop", false);
+    
+    private Filter                           filter;
     
     @Override
     public void initialize()
@@ -118,9 +125,12 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 @Override
                 public void variableChanged(EzVar<Boolean> source, Boolean newValue)
                 {
-                    linearZ.setValue(!newValue);
-                    linearZ.setVisible(!newValue);
-                    gaussianZ.setVisible(!newValue);
+                    if (newValue)
+                    {
+                        linearZ.setValue(false);
+                        linearZ.setVisible(false);
+                        gaussianZ.setVisible(false);
+                    }
                 }
             });
             
@@ -185,8 +195,14 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         addEzComponent(customSequenceGroup);
         kernel2D.addVisibilityTriggerTo(customSequenceGroup, Kernels2D.CUSTOM_SEQUENCE);
         
-        addEzComponent(nonLinType);
-        filterType.addVisibilityTriggerTo(nonLinType, FilterType.NON_LINEAR);
+        addEzComponent(selectionFilter);
+        addEzComponent(selectionRadiusX);
+        addEzComponent(selectionRadiusY);
+        addEzComponent(selectionRadiusZ);
+        filterType.addVisibilityTriggerTo(selectionFilter, FilterType.SELECTION);
+        filterType.addVisibilityTriggerTo(selectionRadiusX, FilterType.SELECTION);
+        filterType.addVisibilityTriggerTo(selectionRadiusY, FilterType.SELECTION);
+        filterType.addVisibilityTriggerTo(selectionRadiusZ, FilterType.SELECTION);
         
         addEzComponent(zeroEdge);
         filterType.addVisibilityTriggerTo(zeroEdge, FilterType.CLASSIC, FilterType.SEPARABLE);
@@ -194,7 +210,6 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         addEzComponent(userKernelWidth);
         kernel1D.addVisibilityTriggerTo(userKernelWidth, Kernels1D.CUSTOM);
         kernel2D.addVisibilityTriggerTo(userKernelWidth, Kernels2D.CUSTOM);
-        filterType.addVisibilityTriggerTo(userKernelWidth, FilterType.NON_LINEAR);
         
         addEzComponent(userKernelHeight);
         kernel2D.addVisibilityTriggerTo(userKernelHeight, Kernels2D.CUSTOM);
@@ -256,23 +271,52 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 executeClassic(inSeq);
                 break;
             }
-            case NON_LINEAR:
+            case SELECTION:
             {
-                executeNonLinear(inSeq);
+                try
+                {
+                    executeSelectionFilter(inSeq);
+                }
+                catch (Exception e)
+                {
+                    throw new RuntimeException(e);
+                }
                 break;
             }
         }
     }
     
-    private void executeNonLinear(Sequence inSeq)
+    private void executeSelectionFilter(Sequence inSeq) throws InstantiationException, IllegalAccessException
     {
-        Sequence out = SequenceUtil.getCopy(inSeq);
+        SelectionFilter filter = (SelectionFilter) selectionFilter.getValue().getPluginClass().newInstance();
+        
+        this.filter = filter;
+        
+        filter.progress.addListener(new VarListener<Double>()
+        {
+            @Override
+            public void valueChanged(Var<Double> source, Double oldValue, Double newValue)
+            {
+                getUI().setProgressBarValue(newValue);
+            }
+            
+            @Override
+            public void referenceChanged(Var<Double> source, Var<? extends Double> oldReference, Var<? extends Double> newReference)
+            {
+            }
+        });
+        
+        Sequence out = inSeq;
+        
         for (int i = 0; i < iterations.getValue(); i++)
         {
-            NonLinearFilter.filter(stopFlag, out, nonLinType.getValue(), userKernelWidth.getValue() / 2);
+            out = filter.filterSquare(out, selectionRadiusX.getValue(), selectionRadiusY.getValue(), selectionRadiusZ.getValue());
             if (stopFlag.getValue()) break;
         }
         addSequence(out);
+        
+        filter.progress.removeListeners();
+        this.filter = null;
     }
     
     private void executeClassic(Sequence inSeq)
@@ -308,15 +352,36 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         }
         
         Sequence kernel = k2d.toSequence();
-        Sequence output = SequenceUtil.getCopy(inSeq);
+        Sequence output = null;
         
         if (useOpenCL.getValue())
         {
+            output = SequenceUtil.getCopy(inSeq);
             convolutionCL.convolve(output, kernel, zeroEdge.getValue(), iterations.getValue(), stopFlag);
         }
         else
         {
-            Convolution.convolve(output, kernel, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+            final Convolution c = new Convolution();
+            this.filter = c;
+            final VarListener<Double> ld = new VarListener<Double>()
+            {
+                @Override
+                public void valueChanged(Var<Double> source, Double oldValue, Double newValue)
+                {
+                    getUI().setProgressBarValue(newValue);
+                }
+                
+                @Override
+                public void referenceChanged(Var<Double> source, Var<? extends Double> oldReference, Var<? extends Double> newReference)
+                {
+                    
+                }
+            };
+            c.progress.addListener(ld);
+            output = c.convolve(input.getValue(true), kernel, zeroEdge.getValue(), iterations.getValue());
+            c.progress.removeListener(ld);
+            c.service.shutdown();
+            this.filter = null;
         }
         
         output.setName(inSeq.getName() + " * " + kernel.getName());
@@ -404,5 +469,6 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     public void stopExecution()
     {
         stopFlag.setValue(true);
+        if (filter != null) filter.stopFlag.setValue(true);
     }
 }
