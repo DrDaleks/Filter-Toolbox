@@ -1,6 +1,6 @@
-package plugins.adufour.filters;
+package plugins.adufour.filtering;
 
-public class LocalMax extends GenericFilterOperation
+public class LocalMax extends SelectionFilter
 {
     @Override
     double process(double currentValue, double[] neighborhood, int neighborhoodSize)

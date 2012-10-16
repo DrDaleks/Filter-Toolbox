@@ -1,6 +1,6 @@
-package plugins.adufour.filters;
+package plugins.adufour.filtering;
 
-public class Mean extends GenericFilterOperation
+public class Mean extends SelectionFilter
 {
     @Override
     double process(double currentValue, double[] neighborhood, int neighborhoodSize)
