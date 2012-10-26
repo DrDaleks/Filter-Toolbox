@@ -4,6 +4,7 @@ import icy.image.IcyBufferedImage;
 import icy.sequence.DimensionId;
 import icy.sequence.Sequence;
 import icy.sequence.SequenceUtil;
+import icy.system.IcyHandledException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -258,31 +259,37 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         stopFlag.setValue(false);
         
         Sequence inSeq = input.getValue(true);
-        
-        switch (filterType.getValue())
+        try
         {
-            case SEPARABLE:
+            switch (filterType.getValue())
             {
-                executeSeparable(inSeq);
-                break;
-            }
-            case CLASSIC:
-            {
-                executeClassic(inSeq);
-                break;
-            }
-            case SELECTION:
-            {
-                try
+                case SEPARABLE:
                 {
-                    executeSelectionFilter(inSeq);
+                    executeSeparable(inSeq);
+                    break;
                 }
-                catch (Exception e)
+                case CLASSIC:
                 {
-                    throw new RuntimeException(e);
+                    executeClassic(inSeq);
+                    break;
                 }
-                break;
+                case SELECTION:
+                {
+                    try
+                    {
+                        executeSelectionFilter(inSeq);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new RuntimeException(e);
+                    }
+                    break;
+                }
             }
+        }
+        catch (CLException.OutOfHostMemory o)
+        {
+            throw new IcyHandledException("Not enough memory to perform the filtering on the GPU. Disable OpenCL and retry.");
         }
     }
     

@@ -14,6 +14,7 @@ import plugins.adufour.vars.lang.VarBoolean;
 import com.nativelibs4java.opencl.CLBuildException;
 import com.nativelibs4java.opencl.CLContext;
 import com.nativelibs4java.opencl.CLEvent;
+import com.nativelibs4java.opencl.CLException;
 import com.nativelibs4java.opencl.CLFloatBuffer;
 import com.nativelibs4java.opencl.CLKernel;
 import com.nativelibs4java.opencl.CLMem.MapFlags;
@@ -35,7 +36,7 @@ public class ConvolutionCL
 		clProgram = program;
 	}
 	
-	public void convolve(Sequence input, Sequence kernel, boolean zeroEdge, int nbIter, VarBoolean stopFlag)
+	public void convolve(Sequence input, Sequence kernel, boolean zeroEdge, int nbIter, VarBoolean stopFlag) throws CLException.OutOfHostMemory
 	{
 		String funcName = zeroEdge ? "convolve2D" : "convolve2D_mirror";
 		
