@@ -8,7 +8,6 @@ import icy.type.collection.array.Array1DUtil;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
-import plugins.adufour.ezplug.EzException;
 import plugins.adufour.vars.lang.VarBoolean;
 
 import com.nativelibs4java.opencl.CLBuildException;
@@ -36,20 +35,13 @@ public class ConvolutionCL
 		clProgram = program;
 	}
 	
-	public void convolve(Sequence input, Sequence kernel, boolean zeroEdge, int nbIter, VarBoolean stopFlag) throws CLException.OutOfHostMemory
+	public void convolve(Sequence input, Sequence kernel, boolean zeroEdge, int nbIter, VarBoolean stopFlag) throws CLException, CLBuildException
 	{
 		String funcName = zeroEdge ? "convolve2D" : "convolve2D_mirror";
 		
 		CLKernel clKernel;
 		
-		try
-		{
-			clKernel = clProgram.createKernel(funcName);
-		}
-		catch (CLBuildException e)
-		{
-			throw new EzException("Unable to load OpenCL function \"" + funcName + "\"", true);
-		}
+		clKernel = clProgram.createKernel(funcName);
 		
 		int dataSize = input.getSizeX() * input.getSizeY();
 		

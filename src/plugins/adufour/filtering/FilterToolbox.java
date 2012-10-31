@@ -361,12 +361,25 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         Sequence kernel = k2d.toSequence();
         Sequence output = null;
         
+        boolean openCL_failed = false;
+        
         if (useOpenCL.getValue())
         {
-            output = SequenceUtil.getCopy(inSeq);
-            convolutionCL.convolve(output, kernel, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+            try
+            {
+                output = SequenceUtil.getCopy(inSeq);
+                convolutionCL.convolve(output, kernel, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                openCL_failed = false;
+            }
+            catch (Exception e)
+            {
+                openCL_failed = true;
+                e.printStackTrace();
+                System.err.println("WARNING: Unable to run in OpenCL mode. Switching to CPU mode.");
+            }
         }
-        else
+        
+        if (!useOpenCL.getValue() || openCL_failed)
         {
             final Convolution c = new Convolution();
             this.filter = c;
@@ -427,22 +440,35 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         if (linearY.getValue()) directions += "Y";
         if (linearZ.getValue()) directions += "Z";
         
+        boolean openCL_failed = false;
+        
         if (useOpenCL.getValue())
         {
-            // the kernel along X is ready
-            if (linearX.getValue()) convolutionCL.convolve(output, kernelX, zeroEdge.getValue(), iterations.getValue(), stopFlag);
-            
-            if (linearY.getValue())
+            try
             {
-                // the kernel along Y must be rotated from X
-                Sequence kernelY_vertical = new Sequence(new IcyBufferedImage(1, kernelY.getSizeX(), 1, kernelY.getDataType_()));
-                System.arraycopy(kernelY.getDataXY(0, 0, 0), 0, kernelY_vertical.getDataXY(0, 0, 0), 0, kernelY.getSizeX());
-                convolutionCL.convolve(output, kernelY_vertical, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                // the kernel along X is ready
+                if (linearX.getValue()) convolutionCL.convolve(output, kernelX, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                
+                if (linearY.getValue())
+                {
+                    // the kernel along Y must be rotated from X
+                    Sequence kernelY_vertical = new Sequence(new IcyBufferedImage(1, kernelY.getSizeX(), 1, kernelY.getDataType_()));
+                    System.arraycopy(kernelY.getDataXY(0, 0, 0), 0, kernelY_vertical.getDataXY(0, 0, 0), 0, kernelY.getSizeX());
+                    convolutionCL.convolve(output, kernelY_vertical, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                }
+                
+                // no convolution along Z yet.
+                openCL_failed = false;
             }
-            
-            // no convolution along Z yet.
+            catch (Exception e)
+            {
+                openCL_failed = true;
+                e.printStackTrace();
+                System.err.println("WARNING: Unable to run in OpenCL mode. Continuing in CPU mode.");
+            }
         }
-        else
+        
+        if (!useOpenCL.getValue() || openCL_failed)
         {
             if (linearX.getValue() || linearY.getValue() || linearZ.getValue())
             {
