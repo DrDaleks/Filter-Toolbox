@@ -309,6 +309,8 @@ public class Convolution1D
                     System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
             }
         }
+        
+        service.shutdown();
     }
     
     /**
