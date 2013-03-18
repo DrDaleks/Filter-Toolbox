@@ -493,8 +493,8 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     {
         if (useOpenCL.getValue())
         {
-            queue.release();
-            context.release();
+            if (queue != null) queue.release();
+            if (context != null) context.release();
         }
     }
     
