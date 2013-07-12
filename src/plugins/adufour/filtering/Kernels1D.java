@@ -29,6 +29,7 @@ public enum Kernels1D implements IKernel
 	Kernels1D(double[] data, boolean isSeparable)
 	{
 		this.data = data;
+		this.isSeparable = isSeparable;
 	}
 	
 	public boolean isSeparable()
