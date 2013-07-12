@@ -181,6 +181,7 @@ public abstract class SelectionFilter extends Filter
             } // end for(c)
         } // end for(t)
         
+        out.dataChanged();
         return out;
     }
 }
