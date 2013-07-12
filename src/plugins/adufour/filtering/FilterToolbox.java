@@ -53,6 +53,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     public EzVarEnum<FilterType>             filterType       = new EzVarEnum<FilterToolbox.FilterType>("Filter type", FilterType.values());
     
     public EzVarEnum<Kernels1D>              kernel1D         = new EzVarEnum<Kernels1D>("1D Kernels", Kernels1D.values());
+    public EzVarBoolean                      linearSeparable  = new EzVarBoolean("Separable", true);
     public EzVarBoolean                      linearX          = new EzVarBoolean("Along X", true);
     public EzVarBoolean                      linearY          = new EzVarBoolean("Along Y", true);
     public EzVarBoolean                      linearZ          = new EzVarBoolean("Along Z", true);
@@ -100,6 +101,8 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     @Override
     public void initialize()
     {
+        addEzComponent(input);
+        
         input.addVarChangeListener(new EzVarListener<Sequence>()
         {
             @Override
@@ -109,14 +112,15 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 
                 boolean is3D = newValue.getSizeZ() > 1;
                 
-                linearZ.setValue(is3D);
                 linearZ.setVisible(is3D);
                 gaussianZ.setVisible(is3D);
+                selectionRadiusZ.setVisible(is3D);
             }
         });
+        input.valueChanged(input.getVariable(), null, input.getValue());
         
-        addEzComponent(input);
-        
+        addEzComponent(filterType);
+
         addEzComponent(iterations);
         
         try
@@ -128,14 +132,14 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 {
                     if (newValue)
                     {
-                        linearZ.setValue(false);
                         linearZ.setVisible(false);
                         gaussianZ.setVisible(false);
                     }
                 }
             });
             
-            addEzComponent(useOpenCL);
+            // The OpenCL option should now be a default (implementation switches to CPU when necessary)
+            //addEzComponent(useOpenCL);
             useOpenCL.setVisible(false);
             context = JavaCL.createBestContext();
             queue = context.createDefaultQueue();
@@ -171,19 +175,22 @@ public class FilterToolbox extends EzPlug implements EzStoppable
             System.out.println("Warning (FilterToolbox): OpenCL drivers not found. Using basic Java implementation.");
         }
         
-        addEzComponent(filterType);
         filterType.addVisibilityTriggerTo(useOpenCL, FilterType.CLASSIC, FilterType.SEPARABLE);
+        filterType.addVisibilityTriggerTo(iterations, FilterType.CLASSIC, FilterType.SEPARABLE);
         
         addEzComponent(kernel1D);
         filterType.addVisibilityTriggerTo(kernel1D, FilterType.SEPARABLE);
         
-        EzGroup groupLinear = new EzGroup("Directions", linearX, linearY, linearZ);
+        EzGroup groupLinear = new EzGroup("Directions", linearX, linearY, linearZ, linearSeparable);
         addEzComponent(groupLinear);
         filterType.addVisibilityTriggerTo(groupLinear, FilterType.SEPARABLE);
+        kernel1D.addVisibilityTriggerTo(linearSeparable, Kernels1D.CUSTOM);
+        useOpenCL.addVisibilityTriggerTo(linearZ, false);
         
         EzGroup groupGaussian = new EzGroup("Gaussian filter", gaussianX, gaussianY, gaussianZ);
         addEzComponent(groupGaussian);
         kernel1D.addVisibilityTriggerTo(groupGaussian, Kernels1D.CUSTOM_GAUSSIAN);
+        useOpenCL.addVisibilityTriggerTo(gaussianZ, false);
         
         addEzComponent(kernel2D);
         filterType.addVisibilityTriggerTo(kernel2D, FilterType.CLASSIC);
@@ -196,14 +203,9 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         addEzComponent(customSequenceGroup);
         kernel2D.addVisibilityTriggerTo(customSequenceGroup, Kernels2D.CUSTOM_SEQUENCE);
         
-        addEzComponent(selectionFilter);
-        addEzComponent(selectionRadiusX);
-        addEzComponent(selectionRadiusY);
-        addEzComponent(selectionRadiusZ);
-        filterType.addVisibilityTriggerTo(selectionFilter, FilterType.SELECTION);
-        filterType.addVisibilityTriggerTo(selectionRadiusX, FilterType.SELECTION);
-        filterType.addVisibilityTriggerTo(selectionRadiusY, FilterType.SELECTION);
-        filterType.addVisibilityTriggerTo(selectionRadiusZ, FilterType.SELECTION);
+        EzGroup groupSelection = new EzGroup("Selection filter", selectionFilter, selectionRadiusX, selectionRadiusY, selectionRadiusZ);
+        addEzComponent(groupSelection);
+        filterType.addVisibilityTriggerTo(groupSelection, FilterType.SELECTION);
         
         addEzComponent(zeroEdge);
         filterType.addVisibilityTriggerTo(zeroEdge, FilterType.CLASSIC, FilterType.SEPARABLE);
@@ -413,52 +415,143 @@ public class FilterToolbox extends EzPlug implements EzStoppable
     {
         Kernels1D k1d = kernel1D.getValue();
         
-        Sequence kernelX, kernelY, kernelZ;
+        Sequence kernelX = null, kernelY = null, kernelZ = null;
         
-        switch (kernel1D.getValue())
+        int nbDirections = 0;
+        
+        switch (k1d)
         {
             case CUSTOM_GAUSSIAN:
-                kernelX = k1d.createGaussianKernel1D(gaussianX.getValue()).toSequence();
-                kernelY = k1d.createGaussianKernel1D(gaussianY.getValue()).toSequence();
-                kernelZ = k1d.createGaussianKernel1D(gaussianZ.getValue()).toSequence();
+            {
+                linearSeparable.setValue(true);
+                
+                if (linearX.getValue() && gaussianX.getValue() > 1e-10)
+                {
+                    kernelX = k1d.createGaussianKernel1D(gaussianX.getValue()).toSequence();
+                    nbDirections++;
+                }
+                if (linearY.getValue() && gaussianY.getValue() > 1e-10)
+                {
+                    kernelY = k1d.createGaussianKernel1D(gaussianY.getValue()).toSequence();
+                    nbDirections++;
+                }
+                if (linearZ.getValue() && gaussianZ.getValue() > 1e-10)
+                {
+                    kernelZ = k1d.createGaussianKernel1D(gaussianZ.getValue()).toSequence();
+                    nbDirections++;
+                }
+            }
+            break;
+            
+            case GRADIENT:
+            {
+                linearSeparable.setValue(false);
+                
+                Sequence kernel = k1d.toSequence();
+                
+                if (linearX.getValue())
+                {
+                    kernelX = kernel;
+                    nbDirections++;
+                }
+                if (linearY.getValue())
+                {
+                    kernelY = kernel;
+                    nbDirections++;
+                }
+                if (linearZ.getValue())
+                {
+                    kernelZ = kernel;
+                    nbDirections++;
+                }
+            }
             break;
             
             case CUSTOM:
             {
-                kernelX = kernelY = kernelZ = k1d.createCustomKernel1D(kernelLines.get(0).getValue(), false).toSequence();
+                Sequence kernel = k1d.createCustomKernel1D(kernelLines.get(0).getValue(), false).toSequence();
+                
+                if (linearX.getValue())
+                {
+                    kernelX = kernel;
+                    nbDirections++;
+                }
+                if (linearY.getValue())
+                {
+                    kernelY = kernel;
+                    nbDirections++;
+                }
+                if (linearZ.getValue())
+                {
+                    kernelZ = kernel;
+                    nbDirections++;
+                }
             }
             break;
-            
-            default:
-                kernelX = kernelY = kernelZ = k1d.toSequence();
         }
         
-        Sequence output = SequenceUtil.getCopy(inSeq);
-        
-        String directions = " along ";
-        if (linearX.getValue()) directions += "X";
-        if (linearY.getValue()) directions += "Y";
-        if (linearZ.getValue()) directions += "Z";
+        if (nbDirections == 0) throw new IcyHandledException("Filter toolbox: no direction selected");
         
         boolean openCL_failed = false;
         
         if (useOpenCL.getValue())
         {
-            try
+            if (linearZ.getValue())
             {
-                // the kernel along X is ready
-                if (linearX.getValue()) convolutionCL.convolve(output, kernelX, zeroEdge.getValue(), iterations.getValue(), stopFlag);
-                
-                if (linearY.getValue())
+                System.out.println("Warning: unable to use OpenCL for a convolution along the Z axis, continuing in CPU mode");
+                openCL_failed = true;
+            }
+            else try
+            {
+                if (linearSeparable.getValue())
                 {
-                    // the kernel along Y must be rotated from X
-                    Sequence kernelY_vertical = new Sequence(new IcyBufferedImage(1, kernelY.getSizeX(), 1, kernelY.getDataType_()));
-                    System.arraycopy(kernelY.getDataXY(0, 0, 0), 0, kernelY_vertical.getDataXY(0, 0, 0), 0, kernelY.getSizeX());
-                    convolutionCL.convolve(output, kernelY_vertical, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                    // convolve the same data along all required directions sequentially
+                    Sequence output = SequenceUtil.getCopy(inSeq);
+                    String newName = output.getName() + " * " + k1d.name() + " (";
+                    
+                    if (linearX.getValue())
+                    {
+                        convolutionCL.convolve(output, kernelX, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                        newName += 'X';
+                    }
+                    if (linearY.getValue())
+                    {
+                        // in OpenCL mode, the kernel along Y has to be vertical
+                        Sequence kernelY_vertical = new Sequence(new IcyBufferedImage(1, kernelY.getSizeX(), 1, kernelY.getDataType_()));
+                        System.arraycopy(kernelY.getDataXY(0, 0, 0), 0, kernelY_vertical.getDataXY(0, 0, 0), 0, kernelY.getSizeX());
+                        convolutionCL.convolve(output, kernelY_vertical, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                        newName += 'Y';
+                    }
+                    // TODO Z
+                    
+                    output.setName(newName + ")");
+                    output.dataChanged();
+                    addSequence(output);
                 }
-                
-                // no convolution along Z yet.
-                openCL_failed = false;
+                else
+                {
+                    // convolve along each direction in separate sequences
+                    if (linearX.getValue())
+                    {
+                        Sequence output = SequenceUtil.getCopy(inSeq);
+                        convolutionCL.convolve(output, kernelX, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                        output.setName(output.getName() + " * " + k1d.name() + " (X)");
+                        output.dataChanged();
+                        addSequence(output);
+                    }
+                    if (linearY.getValue())
+                    {
+                        Sequence output = SequenceUtil.getCopy(inSeq);
+                        // in OpenCL mode, the kernel along Y has to be vertical
+                        Sequence kernelY_vertical = new Sequence(new IcyBufferedImage(1, kernelY.getSizeX(), 1, kernelY.getDataType_()));
+                        System.arraycopy(kernelY.getDataXY(0, 0, 0), 0, kernelY_vertical.getDataXY(0, 0, 0), 0, kernelY.getSizeX());
+                        convolutionCL.convolve(output, kernelY_vertical, zeroEdge.getValue(), iterations.getValue(), stopFlag);
+                        output.setName(output.getName() + " * " + k1d.name() + " (Y)");
+                        output.dataChanged();
+                        addSequence(output);
+                    }
+                    // TODO Z
+                }
             }
             catch (Exception e)
             {
@@ -470,11 +563,58 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         
         if (!useOpenCL.getValue() || openCL_failed)
         {
-            if (linearX.getValue() || linearY.getValue() || linearZ.getValue())
+            if (linearSeparable.getValue())
             {
                 try
                 {
-                    Convolution1D.convolve(output, linearX.getValue() ? kernelX : null, linearY.getValue() ? kernelY : null, linearZ.getValue() ? kernelZ : null, iterations.getValue(), stopFlag);
+                    Sequence output = SequenceUtil.getCopy(inSeq);
+                    Convolution1D.convolve(output, kernelX, kernelY, kernelZ, iterations.getValue(), stopFlag);
+                    String newName = output.getName() + " * " + k1d.name() + " (";
+                    if (kernelX != null) newName += 'X';
+                    if (kernelY != null) newName += 'Y';
+                    if (kernelZ != null) newName += 'Z';
+                    output.setName(newName + ')');
+                    output.dataChanged();
+                    addSequence(output);
+                }
+                catch (ConvolutionException e)
+                {
+                    throw new EzException(e.getMessage(), true);
+                }
+            }
+            else
+            {
+                if (linearX.getValue()) try
+                {
+                    Sequence output = SequenceUtil.getCopy(inSeq);
+                    Convolution1D.convolve(output, kernelX, null, null, iterations.getValue(), stopFlag);
+                    output.setName(output.getName() + " * " + k1d.name() + " (X)");
+                    output.dataChanged();
+                    addSequence(output);
+                }
+                catch (ConvolutionException e)
+                {
+                    throw new EzException(e.getMessage(), true);
+                }
+                if (linearX.getValue()) try
+                {
+                    Sequence output = SequenceUtil.getCopy(inSeq);
+                    Convolution1D.convolve(output, null, kernelY, null, iterations.getValue(), stopFlag);
+                    output.setName(output.getName() + " * " + k1d.name() + " (Y)");
+                    output.dataChanged();
+                    addSequence(output);
+                }
+                catch (ConvolutionException e)
+                {
+                    throw new EzException(e.getMessage(), true);
+                }
+                if (linearX.getValue()) try
+                {
+                    Sequence output = SequenceUtil.getCopy(inSeq);
+                    Convolution1D.convolve(output, null, null, kernelZ, iterations.getValue(), stopFlag);
+                    output.setName(output.getName() + " * " + k1d.name() + " (Z)");
+                    output.dataChanged();
+                    addSequence(output);
                 }
                 catch (ConvolutionException e)
                 {
@@ -482,10 +622,6 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 }
             }
         }
-        
-        output.setName(inSeq.getName() + " * " + kernelX.getName() + directions);
-        output.updateChannelsBounds(true);
-        addSequence(output);
     }
     
     @Override
