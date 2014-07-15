@@ -4,6 +4,7 @@ import icy.image.IcyBufferedImage;
 import icy.sequence.Sequence;
 import icy.type.DataType;
 import icy.type.collection.array.Array1DUtil;
+import icy.util.OMEUtil;
 
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
@@ -48,7 +49,8 @@ public abstract class SelectionFilter extends Filter
      */
     public Sequence filterSquare(Sequence sequence, int... radius)
     {
-        Sequence out = new Sequence(sequence.getName() + "_" + getDescriptor().getName());
+        Sequence out = new Sequence(OMEUtil.createOMEMetadata(sequence.getMetadata()));
+        out.setName(sequence.getName() + "_" + getDescriptor().getName());
         
         stopFlag.setValue(false);
         progress.setValue(0.0);
@@ -169,11 +171,13 @@ public abstract class SelectionFilter extends Filter
                     }
                     catch (InterruptedException e)
                     {
-                        e.printStackTrace();
+                        Thread.currentThread().interrupt();
+                        return out;
                     }
                     catch (ExecutionException e)
                     {
-                        e.printStackTrace();
+                        Thread.currentThread().interrupt();
+                        return out;
                     }
                     
                     if (stopFlag.getValue()) break convolution;

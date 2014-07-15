@@ -120,7 +120,7 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         input.valueChanged(input.getVariable(), null, input.getValue());
         
         addEzComponent(filterType);
-
+        
         addEzComponent(iterations);
         
         try
@@ -138,8 +138,9 @@ public class FilterToolbox extends EzPlug implements EzStoppable
                 }
             });
             
-            // The OpenCL option should now be a default (implementation switches to CPU when necessary)
-            //addEzComponent(useOpenCL);
+            // The OpenCL option should now be a default (implementation switches to CPU when
+            // necessary)
+            // addEzComponent(useOpenCL);
             useOpenCL.setVisible(false);
             context = JavaCL.createBestContext();
             queue = context.createDefaultQueue();
@@ -265,28 +266,25 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         {
             switch (filterType.getValue())
             {
-                case SEPARABLE:
+            case SEPARABLE: {
+                executeSeparable(inSeq);
+                break;
+            }
+            case CLASSIC: {
+                executeClassic(inSeq);
+                break;
+            }
+            case SELECTION: {
+                try
                 {
-                    executeSeparable(inSeq);
-                    break;
+                    executeSelectionFilter(inSeq);
                 }
-                case CLASSIC:
+                catch (Exception e)
                 {
-                    executeClassic(inSeq);
-                    break;
+                    throw new RuntimeException(e);
                 }
-                case SELECTION:
-                {
-                    try
-                    {
-                        executeSelectionFilter(inSeq);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new RuntimeException(e);
-                    }
-                    break;
-                }
+                break;
+            }
             }
         }
         catch (CLException.OutOfHostMemory o)
@@ -334,30 +332,30 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         
         switch (kernel2D.getValue())
         {
-            case CUSTOM_GABOR:
-                k2d.createGaborKernel2D(gaborSigma.getValue(), gaborKx.getValue(), gaborKy.getValue(), gaborSymmetric.getValue());
+        case CUSTOM_GABOR:
+            k2d.createGaborKernel2D(gaborSigma.getValue(), gaborKx.getValue(), gaborKy.getValue(), gaborSymmetric.getValue());
             break;
+        
+        case CUSTOM: {
+            ArrayList<Double> kernel1D = new ArrayList<Double>();
+            for (int i = 0; i < userKernelHeight.getValue(); i++)
+                for (double d : kernelLines.get(i).getValue())
+                    kernel1D.add(d);
             
-            case CUSTOM:
-            {
-                ArrayList<Double> kernel1D = new ArrayList<Double>();
-                for (int i = 0; i < userKernelHeight.getValue(); i++)
-                    for (double d : kernelLines.get(i).getValue())
-                        kernel1D.add(d);
-                
-                double[] values = new double[kernel1D.size()];
-                for (int i = 0; i < kernel1D.size(); i++)
-                    values[i] = kernel1D.get(i);
-                
-                k2d.createCustomKernel2D(values, userKernelWidth.getValue(), userKernelHeight.getValue(), false);
-            }
-            break;
+            double[] values = new double[kernel1D.size()];
+            for (int i = 0; i < kernel1D.size(); i++)
+                values[i] = kernel1D.get(i);
             
-            case CUSTOM_SEQUENCE:
-            {
-                k2d.createCustomKernel2D(customKernel.getValue(true), customKernel_T.getValue(), customKernel_Z.getValue(), customKernel_C.getValue());
-            }
+            k2d.createCustomKernel2D(values, userKernelWidth.getValue(), userKernelHeight.getValue(), false);
+        }
             break;
+        
+        case CUSTOM_SEQUENCE: {
+            k2d.createCustomKernel2D(customKernel.getValue(true), customKernel_T.getValue(), customKernel_Z.getValue(), customKernel_C.getValue());
+        }
+            break;
+        default:
+            // nothing to do (the filters should already be predefined)
         }
         
         Sequence kernel = k2d.toSequence();
@@ -421,72 +419,69 @@ public class FilterToolbox extends EzPlug implements EzStoppable
         
         switch (k1d)
         {
-            case CUSTOM_GAUSSIAN:
-            {
-                linearSeparable.setValue(true);
-                
-                if (linearX.getValue() && gaussianX.getValue() > 1e-10)
-                {
-                    kernelX = k1d.createGaussianKernel1D(gaussianX.getValue()).toSequence();
-                    nbDirections++;
-                }
-                if (linearY.getValue() && gaussianY.getValue() > 1e-10)
-                {
-                    kernelY = k1d.createGaussianKernel1D(gaussianY.getValue()).toSequence();
-                    nbDirections++;
-                }
-                if (linearZ.getValue() && gaussianZ.getValue() > 1e-10)
-                {
-                    kernelZ = k1d.createGaussianKernel1D(gaussianZ.getValue()).toSequence();
-                    nbDirections++;
-                }
-            }
-            break;
+        case CUSTOM_GAUSSIAN: {
+            linearSeparable.setValue(true);
             
-            case GRADIENT:
+            if (linearX.getValue() && gaussianX.getValue() > 1e-10)
             {
-                linearSeparable.setValue(false);
-                
-                Sequence kernel = k1d.toSequence();
-                
-                if (linearX.getValue())
-                {
-                    kernelX = kernel;
-                    nbDirections++;
-                }
-                if (linearY.getValue())
-                {
-                    kernelY = kernel;
-                    nbDirections++;
-                }
-                if (linearZ.getValue())
-                {
-                    kernelZ = kernel;
-                    nbDirections++;
-                }
+                kernelX = k1d.createGaussianKernel1D(gaussianX.getValue()).toSequence();
+                nbDirections++;
             }
+            if (linearY.getValue() && gaussianY.getValue() > 1e-10)
+            {
+                kernelY = k1d.createGaussianKernel1D(gaussianY.getValue()).toSequence();
+                nbDirections++;
+            }
+            if (linearZ.getValue() && gaussianZ.getValue() > 1e-10)
+            {
+                kernelZ = k1d.createGaussianKernel1D(gaussianZ.getValue()).toSequence();
+                nbDirections++;
+            }
+        }
             break;
+        
+        case GRADIENT: {
+            linearSeparable.setValue(false);
             
-            case CUSTOM:
+            Sequence kernel = k1d.toSequence();
+            
+            if (linearX.getValue())
             {
-                Sequence kernel = k1d.createCustomKernel1D(kernelLines.get(0).getValue(), false).toSequence();
-                
-                if (linearX.getValue())
-                {
-                    kernelX = kernel;
-                    nbDirections++;
-                }
-                if (linearY.getValue())
-                {
-                    kernelY = kernel;
-                    nbDirections++;
-                }
-                if (linearZ.getValue())
-                {
-                    kernelZ = kernel;
-                    nbDirections++;
-                }
+                kernelX = kernel;
+                nbDirections++;
             }
+            if (linearY.getValue())
+            {
+                kernelY = kernel;
+                nbDirections++;
+            }
+            if (linearZ.getValue())
+            {
+                kernelZ = kernel;
+                nbDirections++;
+            }
+        }
+            break;
+        
+        case CUSTOM: {
+            Sequence kernel = k1d.createCustomKernel1D(kernelLines.get(0).getValue(), false).toSequence();
+            
+            if (linearX.getValue())
+            {
+                kernelX = kernel;
+                nbDirections++;
+            }
+            if (linearY.getValue())
+            {
+                kernelY = kernel;
+                nbDirections++;
+            }
+            if (linearZ.getValue())
+            {
+                kernelZ = kernel;
+                nbDirections++;
+            }
+        }
             break;
         }
         

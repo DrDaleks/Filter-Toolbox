@@ -2,23 +2,22 @@ package plugins.adufour.filtering;
 
 import icy.sequence.Sequence;
 import icy.system.SystemUtil;
+import icy.system.thread.Processor;
 import icy.type.DataType;
 import icy.type.collection.array.Array1DUtil;
 
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import plugins.adufour.filtering.FilterToolbox.Axis;
 import plugins.adufour.vars.lang.VarBoolean;
 
 /**
- * 
  * Spatial convolution for separable 1D kernels.
  * 
  * @author Alexandre Dufour
- * 
  */
 public class Convolution1D
 {
@@ -69,19 +68,22 @@ public class Convolution1D
         {
             if (kernel1D_X.getSizeY() > 1 || kernel1D_X.getSizeZ() > 1) throw new IllegalArgumentException("kernel along X is not 1D");
             if (kernel1D_X.getSizeX() % 2 == 0) throw new IllegalArgumentException("kernel along X has even size");
-            if (kernel1D_X.getSizeC() != 1 && kernel1D_X.getSizeC() != sequence.getSizeC()) throw new IllegalArgumentException("kernel along X has " + kernel1D_X.getSizeC() + " channels");
+            if (kernel1D_X.getSizeC() != 1 && kernel1D_X.getSizeC() != sequence.getSizeC())
+                throw new IllegalArgumentException("kernel along X has " + kernel1D_X.getSizeC() + " channels");
         }
         if (kernel1D_Y != null)
         {
             if (kernel1D_Y.getSizeY() > 1 || kernel1D_Y.getSizeZ() > 1) throw new IllegalArgumentException("kernel along Y is not 1D");
             if (kernel1D_Y.getSizeX() % 2 == 0) throw new IllegalArgumentException("kernel along Y has even size");
-            if (kernel1D_Y.getSizeC() != 1 && kernel1D_Y.getSizeC() != sequence.getSizeC()) throw new IllegalArgumentException("kernel along Y has " + kernel1D_Y.getSizeC() + " channels");
+            if (kernel1D_Y.getSizeC() != 1 && kernel1D_Y.getSizeC() != sequence.getSizeC())
+                throw new IllegalArgumentException("kernel along Y has " + kernel1D_Y.getSizeC() + " channels");
         }
         if (kernel1D_Z != null)
         {
             if (kernel1D_Z.getSizeY() > 1 || kernel1D_Z.getSizeZ() > 1) throw new IllegalArgumentException("kernel along Z is not 1D");
             if (kernel1D_Z.getSizeX() % 2 == 0) throw new IllegalArgumentException("kernel along Z has even size");
-            if (kernel1D_Z.getSizeC() != 1 && kernel1D_Z.getSizeC() != sequence.getSizeC()) throw new IllegalArgumentException("kernel along Z has " + kernel1D_Z.getSizeC() + " channels");
+            if (kernel1D_Z.getSizeC() != 1 && kernel1D_Z.getSizeC() != sequence.getSizeC())
+                throw new IllegalArgumentException("kernel along Z has " + kernel1D_Z.getSizeC() + " channels");
         }
         
         double[] kernelX = null;
@@ -97,7 +99,8 @@ public class Convolution1D
         
         if (type == DataType.DOUBLE)
         {
-            convolution: for (int t = 0; t < sequence.getSizeT(); t++)
+            convolution:
+            for (int t = 0; t < sequence.getSizeT(); t++)
                 for (int c = 0; c < sequence.getSizeC(); c++)
                 {
                     if (kernel1D_X != null) kernelX = kernel1D_X.getDataXYAsDouble(Math.min(t, kernel1D_X.getSizeT() - 1), 0, Math.min(c, kernel1D_X.getSizeC() - 1));
@@ -116,7 +119,8 @@ public class Convolution1D
         {
             double[][] z_xy = new double[sequence.getSizeZ()][sequence.getSizeX() * sequence.getSizeY()];
             
-            convolution: for (int t = 0; t < sequence.getSizeT(); t++)
+            convolution:
+            for (int t = 0; t < sequence.getSizeT(); t++)
                 for (int c = 0; c < sequence.getSizeC(); c++)
                 {
                     if (kernel1D_X != null) kernelX = kernel1D_X.getDataXYAsDouble(Math.min(t, kernel1D_X.getSizeT() - 1), 0, Math.min(c, kernel1D_X.getSizeC() - 1));
@@ -177,7 +181,11 @@ public class Convolution1D
         {
             for (int t = 0; t < sequence.getSizeT(); t++)
                 for (int c = 0; c < sequence.getSizeC(); c++)
+                {
                     convolve(sequence.getDataXYZAsDouble(t, c), sequence.getSizeX(), sequence.getSizeY(), kernelX, kernelY, kernelZ);
+                    
+                    if (Thread.currentThread().isInterrupted()) return;
+                }
         }
         else
         {
@@ -190,6 +198,8 @@ public class Convolution1D
                         Array1DUtil.arrayToDoubleArray(sequence.getDataXY(t, z, c), z_xy[z], type.isSigned());
                     
                     convolve(z_xy, sequence.getSizeX(), sequence.getSizeY(), kernelX, kernelY, kernelZ);
+                    
+                    if (Thread.currentThread().isInterrupted()) return;
                     
                     for (int z = 0; z < sequence.getSizeZ(); z++)
                     {
@@ -225,92 +235,105 @@ public class Convolution1D
      */
     public static void convolve(double[][] array, int imageWidth, int imageHeight, double[] kernelX, double[] kernelY, double[] kernelZ) throws ConvolutionException
     {
-        ExecutorService service = Executors.newFixedThreadPool(SystemUtil.getAvailableProcessors());
+        Processor service = new Processor(SystemUtil.getAvailableProcessors() * 2);
         
         int sliceSize = array[0].length;
         
         double[][] temp = new double[array.length][sliceSize];
         
-        if (array.length == 1)
+        try
         {
-            if (kernelX == null)
+            if (array.length == 1)
             {
-                convolve1D(service, array, temp, imageWidth, imageHeight, kernelY, Axis.Y);
-                
-                for (int z = 0; z < array.length; z++)
-                    System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
-            }
-            else if (kernelY == null)
-            {
-                convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
-                
-                for (int z = 0; z < array.length; z++)
-                    System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
+                if (kernelX == null)
+                {
+                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelY, Axis.Y);
+                    
+                    for (int z = 0; z < array.length; z++)
+                        System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
+                }
+                else if (kernelY == null)
+                {
+                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
+                    
+                    for (int z = 0; z < array.length; z++)
+                        System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
+                }
+                else
+                {
+                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
+                    convolve1D(service, temp, array, imageWidth, imageHeight, kernelY, Axis.Y);
+                }
             }
             else
             {
-                convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
-                convolve1D(service, temp, array, imageWidth, imageHeight, kernelY, Axis.Y);
-            }
-        }
-        else
-        {
-            if (kernelX == null)
-            {
-                if (kernelY == null)
+                if (kernelX == null)
                 {
+                    if (kernelY == null)
+                    {
+                        convolve1D(service, array, temp, imageWidth, imageHeight, kernelZ, Axis.Z);
+                        
+                        for (int z = 0; z < array.length; z++)
+                            System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
+                    }
+                    else if (kernelZ == null)
+                    {
+                        convolve1D(service, array, temp, imageWidth, imageHeight, kernelY, Axis.Y);
+                        
+                        for (int z = 0; z < array.length; z++)
+                            System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
+                    }
+                    else
+                    {
+                        convolve1D(service, array, temp, imageWidth, imageHeight, kernelY, Axis.Y);
+                        convolve1D(service, temp, array, imageWidth, imageHeight, kernelZ, Axis.Z);
+                    }
+                }
+                // kernel_X is not null from here on
+                else if (kernelY == null)
+                {
+                    if (kernelZ == null)
+                    {
+                        convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
+                        
+                        for (int z = 0; z < array.length; z++)
+                            System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
+                    }
+                    else
+                    {
+                        convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
+                        convolve1D(service, temp, array, imageWidth, imageHeight, kernelZ, Axis.Z);
+                    }
+                }
+                // kernel_X and kernel_Y are not null from here
+                else if (kernelZ == null)
+                {
+                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
+                    convolve1D(service, temp, array, imageWidth, imageHeight, kernelY, Axis.Y);
+                }
+                else
+                {
+                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
+                    convolve1D(service, temp, array, imageWidth, imageHeight, kernelY, Axis.Y);
                     convolve1D(service, array, temp, imageWidth, imageHeight, kernelZ, Axis.Z);
                     
                     for (int z = 0; z < array.length; z++)
                         System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
                 }
-                else if (kernelZ == null)
-                {
-                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelY, Axis.Y);
-                    
-                    for (int z = 0; z < array.length; z++)
-                        System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
-                }
-                else
-                {
-                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelY, Axis.Y);
-                    convolve1D(service, temp, array, imageWidth, imageHeight, kernelZ, Axis.Z);
-                }
-            }
-            // kernel_X is not null from here on
-            else if (kernelY == null)
-            {
-                if (kernelZ == null)
-                {
-                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
-                    
-                    for (int z = 0; z < array.length; z++)
-                        System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
-                }
-                else
-                {
-                    convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
-                    convolve1D(service, temp, array, imageWidth, imageHeight, kernelZ, Axis.Z);
-                }
-            }
-            // kernel_X and kernel_Y are not null from here
-            else if (kernelZ == null)
-            {
-                convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
-                convolve1D(service, temp, array, imageWidth, imageHeight, kernelY, Axis.Y);
-            }
-            else
-            {
-                convolve1D(service, array, temp, imageWidth, imageHeight, kernelX, Axis.X);
-                convolve1D(service, temp, array, imageWidth, imageHeight, kernelY, Axis.Y);
-                convolve1D(service, array, temp, imageWidth, imageHeight, kernelZ, Axis.Z);
-                
-                for (int z = 0; z < array.length; z++)
-                    System.arraycopy(temp[z], 0, array[z], 0, sliceSize);
             }
         }
-        
-        service.shutdown();
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+        }
+        catch (ExecutionException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            service.shutdown();
+        }
     }
     
     /**
@@ -337,9 +360,24 @@ public class Convolution1D
      */
     public static void convolve1D(double[][] input, double[][] output, int width, int height, double[] kernel, Axis axis) throws ConvolutionException
     {
-        ExecutorService service = Executors.newFixedThreadPool(SystemUtil.getAvailableProcessors());
-        convolve1D(service, input, output, width, height, kernel, axis);
-        service.shutdown();
+        Processor service = new Processor(SystemUtil.getAvailableProcessors() * 2);
+        
+        try
+        {
+            convolve1D(service, input, output, width, height, kernel, axis);
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+        }
+        catch (ExecutionException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            service.shutdown();
+        }
     }
     
     /**
@@ -363,9 +401,11 @@ public class Convolution1D
      *            the axis along which to convolve
      * @throws ConvolutionException
      *             if a kernel is too large w.r.t. the image size
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     public static void convolve1D(ExecutorService service, final double[][] input, final double[][] output, final int width, final int height, final double[] kernel, Axis axis)
-            throws ConvolutionException
+            throws ConvolutionException, InterruptedException, ExecutionException
     {
         try
         {
@@ -375,282 +415,283 @@ public class Convolution1D
             
             switch (axis)
             {
-                case X:
-                {
-                    ArrayList<Future<?>> tasks = new ArrayList<Future<?>>(input.length);
-                    
-                    for (int z = 0; z < input.length; z++)
-                    {
-                        final double[] inSlice = input[z];
-                        final double[] outSlice = output[z];
-                        
-                        tasks.add(service.submit(new Runnable()
-                        {
-                            public void run()
-                            {
-                                int xy = 0;
-                                for (int y = 0; y < height; y++)
-                                {
-                                    int x = 0;
-                                    
-                                    // store the offset of the first and last elements of the line
-                                    // they will be used to compute mirror conditions
-                                    int xStartOffset = xy;
-                                    int xEndOffset = xy + width - 1;
-                                    
-                                    // convolve the west border (mirror condition)
-                                    
-                                    for (; x < kRadius; x++, xy++)
-                                    {
-                                        double value = 0;
-                                        
-                                        for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-                                        {
-                                            int inOffset = xy + kOffset;
-                                            if (inOffset < xStartOffset) inOffset = xStartOffset + (xStartOffset - inOffset);
-                                            
-                                            value += inSlice[inOffset] * kernel[kIndex];
-                                        }
-                                        
-                                        outSlice[xy] = value;
-                                    }
-                                    
-                                    // convolve the central area until the east border
-                                    
-                                    int eastBorder = width - kRadius;
-                                    
-                                    for (; x < eastBorder; x++, xy++)
-                                    {
-                                        double value = 0;
-                                        
-                                        for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-                                        {
-                                            value += inSlice[xy + kOffset] * kernel[kIndex];
-                                        }
-                                        
-                                        outSlice[xy] = value;
-                                    }
-                                    
-                                    // convolve the east border
-                                    
-                                    for (; x < width; x++, xy++)
-                                    {
-                                        double value = 0;
-                                        
-                                        for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-                                        {
-                                            int inOffset = xy + kOffset;
-                                            if (inOffset >= xEndOffset) inOffset = xEndOffset - (inOffset - xEndOffset);
-                                            
-                                            value += inSlice[inOffset] * kernel[kIndex];
-                                        }
-                                        
-                                        outSlice[xy] = value;
-                                    }
-                                }
-                            }
-                        }));
-                    }
-                    
-                    for (Future<?> task : tasks)
-                        task.get();
-                }
-                break;
+            case X: {
+                ArrayList<Future<?>> tasks = new ArrayList<Future<?>>(input.length);
                 
-                case Y:
+                for (int z = 0; z < input.length; z++)
                 {
-                    final int kRadiusY = kRadius * width;
+                    final double[] inSlice = input[z];
+                    final double[] outSlice = output[z];
                     
-                    ArrayList<Future<?>> tasks = new ArrayList<Future<?>>(input.length);
-                    
-                    for (int z = 0; z < input.length; z++)
+                    tasks.add(service.submit(new Runnable()
                     {
-                        final double[] in = input[z];
-                        final double[] out = output[z];
-                        
-                        tasks.add(service.submit(new Runnable()
+                        public void run()
                         {
-                            public void run()
+                            int xy = 0;
+                            for (int y = 0; y < height; y++)
                             {
+                                int x = 0;
                                 
-                                int xy = 0;
+                                // store the offset of the first and last elements of the line
+                                // they will be used to compute mirror conditions
+                                int xStartOffset = xy;
+                                int xEndOffset = xy + width - 1;
                                 
-                                int y = 0;
+                                // convolve the west border (mirror condition)
                                 
-                                // convolve the north border (mirror condition)
-                                
-                                for (; y < kRadius; y++)
+                                for (; x < kRadius; x++, xy++)
                                 {
-                                    for (int x = 0; x < width; x++, xy++)
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
                                     {
-                                        int yStartOffset = x;
+                                        int inOffset = xy + kOffset;
+                                        if (inOffset < xStartOffset) inOffset = xStartOffset + (xStartOffset - inOffset);
                                         
-                                        double value = 0;
-                                        
-                                        for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
-                                        {
-                                            int inOffset = xy + kOffset;
-                                            if (inOffset < 0) inOffset = yStartOffset - inOffset;
-                                            
-                                            value += in[inOffset] * kernel[kIndex];
-                                        }
-                                        
-                                        out[xy] = value;
+                                        value += inSlice[inOffset] * kernel[kIndex];
                                     }
+                                    
+                                    outSlice[xy] = value;
                                 }
                                 
-                                // convolve the central area until the south border
+                                // convolve the central area until the east border
                                 
-                                int southBorder = height - kRadius;
+                                int eastBorder = width - kRadius;
                                 
-                                for (; y < southBorder; y++)
+                                for (; x < eastBorder; x++, xy++)
                                 {
-                                    for (int x = 0; x < width; x++, xy++)
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
                                     {
-                                        double value = 0;
-                                        
-                                        for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
-                                        {
-                                            value += in[xy + kOffset] * kernel[kIndex];
-                                        }
-                                        
-                                        out[xy] = value;
+                                        value += inSlice[xy + kOffset] * kernel[kIndex];
                                     }
+                                    
+                                    outSlice[xy] = value;
                                 }
                                 
-                                // convolve the south border
+                                // convolve the east border
                                 
-                                for (; y < height; y++)
+                                for (; x < width; x++, xy++)
                                 {
-                                    for (int x = 0; x < width; x++, xy++)
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
                                     {
-                                        int yEndOffset = sliceSize - width + x;
+                                        int inOffset = xy + kOffset;
+                                        if (inOffset >= xEndOffset) inOffset = xEndOffset - (inOffset - xEndOffset);
                                         
-                                        double value = 0;
-                                        
-                                        for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
-                                        {
-                                            int inOffset = xy + kOffset;
-                                            if (inOffset >= sliceSize) inOffset = yEndOffset - (inOffset - yEndOffset);
-                                            
-                                            value += in[inOffset] * kernel[kIndex];
-                                        }
-                                        
-                                        out[xy] = value;
+                                        value += inSlice[inOffset] * kernel[kIndex];
                                     }
+                                    
+                                    outSlice[xy] = value;
                                 }
                             }
-                        }));
-                    }
-                    for (Future<?> task : tasks)
-                        task.get();
+                        }
+                    }));
                 }
-                break;
                 
-                case Z:
+                for (Future<?> task : tasks)
+                    task.get();
+                
+            }
+                break;
+            
+            case Y: {
+                final int kRadiusY = kRadius * width;
+                
+                ArrayList<Future<?>> tasks = new ArrayList<Future<?>>(input.length);
+                
+                for (int z = 0; z < input.length; z++)
                 {
-                    ArrayList<Future<?>> tasks = new ArrayList<Future<?>>(input.length);
+                    final double[] in = input[z];
+                    final double[] out = output[z];
                     
-                    int z = 0;
-                    for (; z < kRadius; z++)
+                    tasks.add(service.submit(new Runnable()
                     {
-                        final double[] out = output[z];
-                        final int slice = z;
-                        tasks.add(service.submit(new Runnable()
+                        public void run()
                         {
-                            public void run()
+                            
+                            int xy = 0;
+                            
+                            int y = 0;
+                            
+                            // convolve the north border (mirror condition)
+                            
+                            for (; y < kRadius; y++)
                             {
-                                
-                                int xy = 0;
-                                
-                                for (int y = 0; y < height; y++)
+                                for (int x = 0; x < width; x++, xy++)
                                 {
-                                    for (int x = 0; x < width; x++, xy++)
+                                    int yStartOffset = x;
+                                    
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
                                     {
-                                        double value = 0;
+                                        int inOffset = xy + kOffset;
+                                        if (inOffset < 0) inOffset = yStartOffset - inOffset;
                                         
-                                        for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-                                        {
-                                            int inSlice = slice + kOffset;
-                                            if (inSlice < 0) inSlice = -inSlice;
-                                            
-                                            value += input[inSlice][xy] * kernel[kIndex];
-                                        }
-                                        
-                                        out[xy] = value;
+                                        value += in[inOffset] * kernel[kIndex];
                                     }
+                                    
+                                    out[xy] = value;
                                 }
                             }
-                        }));
-                    }
-                    
-                    int bottomBorder = input.length - kRadius;
-                    
-                    for (; z < bottomBorder; z++)
-                    {
-                        final double[] out = output[z];
-                        final int slice = z;
-                        tasks.add(service.submit(new Runnable()
-                        {
-                            public void run()
+                            
+                            // convolve the central area until the south border
+                            
+                            int southBorder = height - kRadius;
+                            
+                            for (; y < southBorder; y++)
                             {
-                                
-                                int xy = 0;
-                                
-                                for (int y = 0; y < height; y++)
+                                for (int x = 0; x < width; x++, xy++)
                                 {
-                                    for (int x = 0; x < width; x++, xy++)
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
                                     {
-                                        double value = 0;
-                                        
-                                        for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-                                        {
-                                            value += input[slice + kOffset][xy] * kernel[kIndex];
-                                        }
-                                        
-                                        out[xy] = value;
+                                        value += in[xy + kOffset] * kernel[kIndex];
                                     }
+                                    
+                                    out[xy] = value;
                                 }
                             }
-                        }));
-                    }
-                    
-                    final int zEndOffset = input.length - 1;
-                    
-                    for (; z < input.length; z++)
-                    {
-                        final double[] out = output[z];
-                        final int slice = z;
-                        tasks.add(service.submit(new Runnable()
-                        {
-                            public void run()
+                            
+                            // convolve the south border
+                            
+                            for (; y < height; y++)
                             {
-                                int xy = 0;
-                                
-                                for (int y = 0; y < height; y++)
+                                for (int x = 0; x < width; x++, xy++)
                                 {
-                                    for (int x = 0; x < width; x++, xy++)
+                                    int yEndOffset = sliceSize - width + x;
+                                    
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadiusY; kOffset <= kRadiusY; kOffset += width, kIndex++)
                                     {
-                                        double value = 0;
+                                        int inOffset = xy + kOffset;
+                                        if (inOffset >= sliceSize) inOffset = yEndOffset - (inOffset - yEndOffset);
                                         
-                                        for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
-                                        {
-                                            int inSlice = slice + kOffset;
-                                            if (inSlice >= input.length) inSlice = zEndOffset - (inSlice - zEndOffset);
-                                            
-                                            value += input[inSlice][xy] * kernel[kIndex];
-                                        }
-                                        
-                                        out[xy] = value;
+                                        value += in[inOffset] * kernel[kIndex];
                                     }
+                                    
+                                    out[xy] = value;
                                 }
                             }
-                        }));
-                    }
-                    
-                    for (Future<?> task : tasks)
-                        task.get();
+                        }
+                    }));
                 }
+                
+                for (Future<?> task : tasks)
+                    task.get();
+                
+            }
+                break;
+            
+            case Z: {
+                ArrayList<Future<?>> tasks = new ArrayList<Future<?>>(input.length);
+                
+                int z = 0;
+                for (; z < kRadius; z++)
+                {
+                    final double[] out = output[z];
+                    final int slice = z;
+                    tasks.add(service.submit(new Runnable()
+                    {
+                        public void run()
+                        {
+                            
+                            int xy = 0;
+                            
+                            for (int y = 0; y < height; y++)
+                            {
+                                for (int x = 0; x < width; x++, xy++)
+                                {
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+                                    {
+                                        int inSlice = slice + kOffset;
+                                        if (inSlice < 0) inSlice = -inSlice;
+                                        
+                                        value += input[inSlice][xy] * kernel[kIndex];
+                                    }
+                                    
+                                    out[xy] = value;
+                                }
+                            }
+                        }
+                    }));
+                }
+                
+                int bottomBorder = input.length - kRadius;
+                
+                for (; z < bottomBorder; z++)
+                {
+                    final double[] out = output[z];
+                    final int slice = z;
+                    tasks.add(service.submit(new Runnable()
+                    {
+                        public void run()
+                        {
+                            
+                            int xy = 0;
+                            
+                            for (int y = 0; y < height; y++)
+                            {
+                                for (int x = 0; x < width; x++, xy++)
+                                {
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+                                    {
+                                        value += input[slice + kOffset][xy] * kernel[kIndex];
+                                    }
+                                    
+                                    out[xy] = value;
+                                }
+                            }
+                        }
+                    }));
+                }
+                
+                final int zEndOffset = input.length - 1;
+                
+                for (; z < input.length; z++)
+                {
+                    final double[] out = output[z];
+                    final int slice = z;
+                    tasks.add(service.submit(new Runnable()
+                    {
+                        public void run()
+                        {
+                            int xy = 0;
+                            
+                            for (int y = 0; y < height; y++)
+                            {
+                                for (int x = 0; x < width; x++, xy++)
+                                {
+                                    double value = 0;
+                                    
+                                    for (int kIndex = 0, kOffset = -kRadius; kOffset <= kRadius; kOffset++, kIndex++)
+                                    {
+                                        int inSlice = slice + kOffset;
+                                        if (inSlice >= input.length) inSlice = zEndOffset - (inSlice - zEndOffset);
+                                        
+                                        value += input[inSlice][xy] * kernel[kIndex];
+                                    }
+                                    
+                                    out[xy] = value;
+                                }
+                            }
+                        }
+                    }));
+                }
+                
+                for (Future<?> task : tasks)
+                    task.get();
+                
+            }
                 break;
             }
         }
@@ -658,7 +699,7 @@ public class Convolution1D
         {
             throw new ConvolutionException("Filter size is too large along " + axis.name(), e);
         }
-        catch (Exception e)
+        catch (RuntimeException e)
         {
             e.printStackTrace();
         }
